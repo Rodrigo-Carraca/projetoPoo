@@ -5,11 +5,31 @@ import pt.iscte.poo.utils.Vector2D;
 import pt.iscte.poo.game.Room;
 
 public class Wall extends GameObject {
-    public Wall(Point2D p, Room r) { super(p, r); }
+	public Wall(Point2D p, Room r) {
+		super(p, r);
+	}
 
-    @Override public String getName() { return "wall"; }
-    @Override public int getLayer() { return 2; }
-    @Override public boolean isTransposable() { return false; }
-    @Override public void move(Vector2D d) { /* static */ }
-    @Override public int mutation() { return 0; }
+	@Override
+	public String getName() {
+		return "wall";
+	}
+
+	@Override
+	public int getLayer() {
+		return 2;
+	}
+
+	@Override
+	public boolean isTransposable() {
+		return false;
+	}
+
+	@Override
+	public void move(Vector2D d) {
+		/* static */ }
+
+	@Override
+	public int mutation() {
+		return 0;
+	}
 }

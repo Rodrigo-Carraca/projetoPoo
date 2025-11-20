@@ -29,8 +29,8 @@ public abstract class GameCharacter extends GameObject {
      * - SmallFish pode atravessar HoleWall (se for SmallFish) — isso é tratado em chamadas.
      * - Usa Room.getTopObjectAt(dest) e isInsideBounds(dest).
      */
-    protected boolean tryMove(pt.iscte.poo.utils.Vector2D delta) {
-        pt.iscte.poo.utils.Point2D dest = this.getPosition().plus(delta);
+    protected boolean tryMove(Vector2D delta) {
+        Point2D dest = this.getPosition().plus(delta);
         Room r = this.getRoom();
         if (r == null) return false;
 

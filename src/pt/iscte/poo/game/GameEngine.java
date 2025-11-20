@@ -22,8 +22,9 @@ public class GameEngine implements Observer {
 
     private static GameEngine INSTANCE = null;
 
-    public static synchronized GameEngine getInstance() {
-        if (INSTANCE == null) INSTANCE = new GameEngine();
+    public static GameEngine getInstance() {
+        if (INSTANCE == null)
+        	INSTANCE = new GameEngine();
         return INSTANCE;
     }
 
@@ -86,7 +87,6 @@ public class GameEngine implements Observer {
 
     private void processTick() {
         lastTickProcessed++;
-        // sem IA
     }
 
     public void updateGUI() {
