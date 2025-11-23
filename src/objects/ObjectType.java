@@ -4,119 +4,48 @@ import pt.iscte.poo.utils.Point2D;
 import pt.iscte.poo.game.Room;
 
 /**
- * Enumerado que mapeia caracteres do ficheiro para tipos de objecto e
- * implementa a fábrica para criação de instâncias.
+ * Factory responsável pela criação de GameObjects a partir
+ * do caractere lido do ficheiro de mapa.
  */
-public enum ObjectType {
+public final class ObjectType {
 
-	WATER(' ', null) {
-		@Override
-		public GameObject create(Point2D pos, Room r) {
-			return new Water(pos, r);
-		}
-	},
-	WALL('W', "wall") {
-		@Override
-		public GameObject create(Point2D pos, Room r) {
-			return new Wall(pos, r);
-		}
-	},
-	HOLE_WALL('X', "holedWall") {
-		@Override
-		public GameObject create(Point2D pos, Room r) {
-			return new HoleWall(pos, r);
-		}
-	},
-	STEEL_H('H', "steelHorizontal") {
-		@Override
-		public GameObject create(Point2D pos, Room r) {
-			return new SteelH(pos, r);
-		}
-	},
-	STEEL_V('V', "steelVertical") {
-		@Override
-		public GameObject create(Point2D pos, Room r) {
-			return new SteelVertical(pos, r);
-		}
-	},
-	CUP('C', "cup") {
-		@Override
-		public GameObject create(Point2D pos, Room r) {
-			return new Cup(pos, r);
-		}
-	},
-	ROCK('R', "stone") {
-		@Override
-		public GameObject create(Point2D pos, Room r) {
-			return new Rock(pos, r);
-		}
-	},
-	ANCHOR('A', "anchor") {
-		@Override
-		public GameObject create(Point2D pos, Room r) {
-			return new Anchor(pos, r);
-		}
-	},
-	BOMB('b', "bomb") {
-		@Override
-		public GameObject create(Point2D pos, Room r) {
-			return new Bomb(pos, r);
-		}
-	},
-	TRAP('T', "trap") {
-		@Override
-		public GameObject create(Point2D pos, Room r) {
-			return new Trap(pos, r);
-		}
-	},
-	LOG('Y', "trunk") {
-		@Override
-		public GameObject create(Point2D pos, Room r) {
-			return new Log(pos, r);
-		}
-	},
-	BIGFISH('B', "bigFishRight") {
-		@Override
-		public GameObject create(Point2D pos, Room r) {
-			return BigFish.getInstance(pos, r);
-		}
-	},
-	SMALLFISH('S', "smallFishRight") {
-		@Override
-		public GameObject create(Point2D pos, Room r) {
-			return SmallFish.getInstance(pos, r);
-		}
-	},
-	UNKNOWN((char) 0, null) {
-		@Override
-		public GameObject create(Point2D pos, Room r) {
-			return null;
-		}
-	};
+    private ObjectType() {
+    }
 
-	private final char ch;
-	private final String defaultSprite;
-
-	ObjectType(char ch, String defaultSprite) {
-		this.ch = ch;
-		this.defaultSprite = defaultSprite;
-	}
-
-	public char getChar() {
-		return ch;
-	}
-
-	public String getDefaultSprite() {
-		return defaultSprite;
-	}
-
-	public abstract GameObject create(Point2D pos, Room r);
-
-	public static ObjectType fromChar(char c) {
-		for (ObjectType t : values()) {
-			if (t.ch == c)
-				return t;
-		}
-		return UNKNOWN;
-	}
+    /**
+     * Cria um GameObject correspondente ao token lido do mapa.
+     * Retorna null para tokens desconhecidos.
+     */
+    public static GameObject create(char token, Point2D pos, Room room) {
+        switch (token) {
+            case ' ':
+                return new Water(pos, room);
+            case 'W':
+                return new Wall(pos, room);
+            case 'X':
+                return new HoleWall(pos, room);
+            case 'H':
+                return new SteelH(pos, room);
+            case 'V':
+                return new SteelVertical(pos, room);
+            case 'C':
+                return new Cup(pos, room);
+            case 'R':
+                return new Rock(pos, room);
+            case 'A':
+                return new Anchor(pos, room);
+            case 'b':
+                return new Bomb(pos, room);
+            case 'T':
+                return new Trap(pos, room);
+            case 'Y':
+                return new Log(pos, room);
+            case 'B':
+                return BigFish.getInstance(pos, room);   // adapta se BigFish não for singleton
+            case 'S':
+                return SmallFish.getInstance(pos, room); // adapta se SmallFish não for singleton
+            default:
+                return null;
+        }
+    }
 }

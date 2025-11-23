@@ -9,6 +9,12 @@ import pt.iscte.poo.game.Room;
  * Base de todos os objectos do jogo.
  */
 public abstract class GameObject implements ImageTile {
+	
+	public enum Weight {
+	    NONE,     // objetos fixos 
+	    LIGHT,    
+	    HEAVY,
+	}
 
 	protected Point2D position;
 	protected Room room;
@@ -42,28 +48,29 @@ public abstract class GameObject implements ImageTile {
 	public void setPosition(int x, int y) {
 		this.position = new Point2D(x, y);
 	}
+	
+	public static GameObject fromChar(char c, Room r, int x, int y) {
+	    Point2D pos = new Point2D(x, y);
+
+	    GameObject obj = ObjectType.create(c, pos, r);
+
+	    if (obj instanceof Water)
+	        return null;
+
+	    return obj;  
+	}
 
 	public abstract boolean isTransposable();
-
 	@Override
 	public abstract String getName();
-
 	@Override
 	public abstract int getLayer();
 
 	public abstract int mutation();
 
 	public abstract void move(Vector2D delta);
+	
+	public abstract Weight getWeight();
 
-	/**
-	 * Factory: delega ao enumerado ObjectType. Room cria sempre a Water no fundo; a
-	 * fábrica devolve null para ' '.
-	 */
-	public static GameObject fromChar(char c, Room r, int x, int y) {
-		Point2D pos = new Point2D(x, y);
-		ObjectType t = ObjectType.fromChar(c);
-		if (t == ObjectType.UNKNOWN || t == ObjectType.WATER)
-			return null;
-		return t.create(pos, r);
-	}
 }
+

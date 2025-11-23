@@ -4,7 +4,7 @@ import pt.iscte.poo.utils.Point2D;
 import pt.iscte.poo.utils.Vector2D;
 import pt.iscte.poo.game.Room;
 
-public class Anchor extends GameObject {
+public class Anchor extends GameObject implements Movable {
 	public Anchor(Point2D p, Room r) {
 		super(p, r);
 	}
@@ -32,4 +32,10 @@ public class Anchor extends GameObject {
 	public int mutation() {
 		return 0;
 	}
+	
+	@Override
+	public Weight getWeight() {
+	    return Weight.HEAVY; // ou HEAVY ou NONE conforme o objeto
+	}
+
 }

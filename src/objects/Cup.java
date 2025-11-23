@@ -4,7 +4,7 @@ import pt.iscte.poo.utils.Point2D;
 import pt.iscte.poo.utils.Vector2D;
 import pt.iscte.poo.game.Room;
 
-public class Cup extends GameObject {
+public class Cup extends GameObject implements Movable {
 	public Cup(Point2D p, Room r) {
 		super(p, r);
 	}
@@ -31,5 +31,11 @@ public class Cup extends GameObject {
 	@Override
 	public int mutation() {
 		return 0;
+	}
+
+	@Override
+	public Weight getWeight() {
+		// TODO Auto-generated method stub
+		return Weight.LIGHT;
 	}
 }

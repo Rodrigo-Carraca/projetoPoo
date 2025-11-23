@@ -32,14 +32,17 @@ public class BigFish extends GameCharacter {
 
 	@Override
 	public void move(Vector2D delta) {
-		if (delta == null)
-			return;
-		if (delta.getX() > 0)
-			facingRight = true;
-		else if (delta.getX() < 0)
-			facingRight = false;
-		tryMove(delta);
+	    if (delta == null)
+	        return;
+
+	    if (delta.getX() > 0)
+	        facingRight = true;
+	    else if (delta.getX() < 0)
+	        facingRight = false;
+
+	    super.move(delta);
 	}
+
 
 	@Override
 	public boolean isTransposable() {
@@ -49,5 +52,22 @@ public class BigFish extends GameCharacter {
 	@Override
 	public int mutation() {
 		return 0;
+	}
+
+	@Override
+	public boolean canPassHole() {
+		// TODO Auto-generated method stub
+		return false;
+	}
+
+	@Override
+	public Weight getWeight() {
+		return  Weight.NONE;
+	}
+
+	@Override
+	public boolean canPushWeight(Weight w) {
+		// TODO Auto-generated method stub
+		return w == GameObject.Weight.LIGHT || w == GameObject.Weight.HEAVY;
 	}
 }

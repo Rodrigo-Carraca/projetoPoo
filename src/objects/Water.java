@@ -32,4 +32,10 @@ public class Water extends GameObject {
 	public int mutation() {
 		return 0;
 	}
+
+	@Override
+	public Weight getWeight() {
+		// TODO Auto-generated method stub
+		return Weight.NONE;
+	}
 }

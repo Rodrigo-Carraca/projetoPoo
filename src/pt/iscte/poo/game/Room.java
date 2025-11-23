@@ -4,15 +4,20 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Scanner;
 
+import pt.iscte.poo.gui.ImageGUI;
 import pt.iscte.poo.gui.ImageTile;
 import pt.iscte.poo.utils.Point2D;
 
 import objects.GameObject;
+import objects.Movable;
 import objects.Water;
 import objects.BigFish;
+import objects.GameCharacter;
 import objects.SmallFish;
 
 /**
@@ -67,7 +72,6 @@ public class Room {
 							room.smallFish = (SmallFish) go;
 					}
 				}
-
 				y++;
 			}
 		} catch (Exception e) {
@@ -78,7 +82,6 @@ public class Room {
 
 		return room;
 	}
-
 	/**
 	 * Retorna a lista ordenada por layer, y e x — método público usado pelo
 	 * GameEngine.
@@ -136,7 +139,7 @@ public class Room {
 	 * Retorna o GameObject de mais alta layer na posição indicada (x,y), ou null se
 	 * não houver objecto nessa posição.
 	 */
-	public GameObject getTopObjectAt(pt.iscte.poo.utils.Point2D p) {
+	public GameObject getTopObjectAt(Point2D p) {
 		GameObject top = null;
 		for (GameObject go : objects) {
 			if (go.getPosition() != null && go.getPosition().getX() == p.getX()
@@ -154,14 +157,131 @@ public class Room {
 	 * ImageGUI). Se ImageGUI não estiver inicializada, assume true para evitar
 	 * NPEs.
 	 */
-	public boolean isInsideBounds(pt.iscte.poo.utils.Point2D p) {
+	public boolean isInsideBounds(Point2D p) {
 		try {
-			if (pt.iscte.poo.gui.ImageGUI.getInstance() != null) {
-				return pt.iscte.poo.gui.ImageGUI.getInstance().isWithinBounds(p);
+			if (ImageGUI.getInstance() != null) {
+				return ImageGUI.getInstance().isWithinBounds(p);
 			}
 		} catch (Exception e) {
 			// ignora e considera in-bounds
 		}
 		return true;
 	}
+	
+	/**
+     * Retorna todos os GameObjects que estão na posição p.
+     * Útil para gravidade no checkpoint seguinte.
+     */
+    public List<GameObject> getObjectsAt(Point2D p) {
+        List<GameObject> list = new ArrayList<>();
+        for (GameObject go : objects) {
+            if (go.getPosition() != null && go.getPosition().equals(p))
+                list.add(go);
+        }
+        return list;
+    }
+    
+    public void moveObject(GameObject obj, Point2D to) {
+        obj.setPosition(to);
+    }
+    
+	// Room.java
+	public void removeObject(GameObject obj) {
+		if (obj == null)
+			return;
+		while (objects.remove(obj)) {
+		}
+		while (imageTiles.remove(obj)) {
+		}
+		if (obj instanceof BigFish && bigFish == obj)
+			bigFish = null;
+		if (obj instanceof SmallFish && smallFish == obj)
+			smallFish = null;
+		try {
+			if (ImageGUI.getInstance() != null)
+				ImageGUI.getInstance().update();
+		} catch (Exception ignored) {
+		}
+	}
+	
+	public void applyGravity() {
+		// snapshot para processar um tick sem efeitos em cadeia imediatos
+		List<GameObject> snapshot = new ArrayList<>(objects);
+		Map<GameObject, Point2D> origPos = new HashMap<>();
+		for (GameObject go : snapshot)
+			origPos.put(go, go.getPosition());
+
+		for (GameObject go : snapshot) {
+			Point2D startPos = origPos.get(go);
+			if (startPos == null)
+				continue;
+			if (go.getPosition() == null)
+				continue;
+			if (!go.getPosition().equals(startPos))
+				continue;
+
+			// só para movables com peso
+			if (!(go instanceof Movable))
+				continue;
+			GameObject.Weight w = go.getWeight();
+			if (w == GameObject.Weight.NONE)
+				continue;
+
+			Point2D below = new Point2D(startPos.getX(), startPos.getY() + 1);
+
+			if (!isInsideBounds(below))
+				continue;
+
+			// --- novo: obter todos os objectos nessa célula (não só o 'top')
+			List<GameObject> cellObjs = getObjectsAt(below); // implementa getObjectsAt se ainda não tens
+
+			// 1) se existir algum GameCharacter nessa célula -> trata como vítima
+			boolean killedSomeone = false;
+			for (GameObject cellObj : cellObjs) {
+				if (cellObj instanceof GameCharacter) {
+					GameCharacter victim = (GameCharacter) cellObj;
+					// podes decidir aqui se apenas HEAVY mata. Exemplo: só HEAVY mata:
+					if (w == GameObject.Weight.HEAVY) {
+						victim.die(); // deve remover do Room (ou faz removeObject depois)
+						// garante que a lista interna é atualizada
+						removeObject(victim);
+						killedSomeone = true;
+					} else {
+						// se quiseres que LIGHT também mate, descomenta estas linhas:
+						// victim.die(); removeObject(victim); killedSomeone = true;
+					}
+				}
+			}
+
+			if (killedSomeone) {
+				// desloca o objecto para a célula onde o(s) peixe(s) estavam
+				moveObject(go, below);
+				if (go instanceof Movable)
+					((Movable) go).onFall(this);
+				continue;
+			}
+
+			// 2) se não houver personagem, procede como antes:
+			// verifica top na célula (o teu método getTopObjectAt continua válido)
+			GameObject top = getTopObjectAt(below);
+
+			if (top == null) {
+				moveObject(go, below);
+				if (go instanceof Movable)
+					((Movable) go).onFall(this);
+				continue;
+			}
+
+			// se o top for transponível (por ex. water com isTransposable()=true)
+			if (top.isTransposable()) {
+				moveObject(go, below);
+				if (go instanceof Movable)
+					((Movable) go).onFall(this);
+				continue;
+			}
+
+			// caso contrário -> bloqueado
+		}
+	}
 }
+                
