@@ -1,287 +1,302 @@
 package pt.iscte.poo.game;
 
 import java.io.File;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Scanner;
+import java.util.*;
 
-import pt.iscte.poo.gui.ImageGUI;
 import pt.iscte.poo.gui.ImageTile;
+import pt.iscte.poo.gui.ImageGUI;
 import pt.iscte.poo.utils.Point2D;
 
 import objects.GameObject;
-import objects.Movable;
 import objects.Water;
 import objects.BigFish;
-import objects.GameCharacter;
 import objects.SmallFish;
+import objects.Movable;
+import objects.GameCharacter;
 
-/**
- * Representa uma sala (Room). Implementação de readRoom usando Scanner e
- * fornece getObjects() público.
- */
 public class Room {
 
-	private List<ImageTile> imageTiles;
-	private List<GameObject> objects;
-	private BigFish bigFish;
-	private SmallFish smallFish;
-	private String name;
+    private List<ImageTile> imageTiles;
+    private List<GameObject> objects;
+    private BigFish bigFish;
+    private SmallFish smallFish;
+    private String name;
 
-	public Room(String name) {
-		this.name = name;
-		this.objects = new ArrayList<>();
-		this.imageTiles = new ArrayList<>();
-	}
+    public Room(String name) {
+        this.name = name;
+        this.objects = new ArrayList<>();
+        this.imageTiles = new ArrayList<>();
+    }
 
-	/**
-	 * Lê um ficheiro de sala usando Scanner.
-	 */
-	public static Room readRoom(File f, GameEngine ge) {
-		Room room = new Room(f.getName());
+    /* ---------------------------------------------------------
+     * LER MAPA
+     * --------------------------------------------------------- */
+    public static Room readRoom(File f, GameEngine ge) {
+        Room room = new Room(f.getName());
 
-		try (Scanner sc = new Scanner(f)) {
-			int y = 0;
-			while (sc.hasNextLine()) {
-				String line = sc.nextLine();
-				if (line == null)
-					line = "";
+        try (Scanner sc = new Scanner(f)) {
+            int y = 0;
+            while (sc.hasNextLine()) {
+                String line = sc.nextLine();
+                if (line == null)
+                    line = "";
 
-				for (int x = 0; x < line.length(); x++) {
-					char c = line.charAt(x);
-					Point2D pos = new Point2D(x, y);
+                for (int x = 0; x < line.length(); x++) {
+                    char c = line.charAt(x);
+                    Point2D pos = new Point2D(x, y);
 
-					// 1) adiciona sempre água no fundo
-					Water w = new Water(pos, room);
-					room.objects.add(w);
-					room.imageTiles.add(w);
+                    // Água sempre adicionada
+                    Water w = new Water(pos, room);
+                    room.objects.add(w);
+                    room.imageTiles.add(w);
 
-					// 2) cria o objecto principal (se houver)
-					GameObject go = GameObject.fromChar(c, room, x, y);
-					if (go != null) {
-						room.objects.add(go);
-						room.imageTiles.add(go);
+                    // Criar objeto
+                    GameObject go = GameObject.fromChar(c, room, x, y);
+                    if (go != null) {
+                        room.objects.add(go);
+                        room.imageTiles.add(go);
 
-						if (go instanceof BigFish)
-							room.bigFish = (BigFish) go;
-						if (go instanceof SmallFish)
-							room.smallFish = (SmallFish) go;
-					}
-				}
-				y++;
-			}
-		} catch (Exception e) {
-			System.err.println("Erro ao ler room: " + f.getName() + " -> " + e.getMessage());
-			e.printStackTrace();
-			return null;
-		}
-
-		return room;
-	}
-	/**
-	 * Retorna a lista ordenada por layer, y e x — método público usado pelo
-	 * GameEngine.
-	 */
-	public List<ImageTile> getObjects() {
-		// copia para não alterar a lista original
-		List<ImageTile> list = new ArrayList<>(imageTiles);
-
-		Collections.sort(list, new Comparator<ImageTile>() {
-			@Override
-			public int compare(ImageTile a, ImageTile b) {
-				int la = (a instanceof GameObject) ? ((GameObject) a).getLayer() : 0;
-				int lb = (b instanceof GameObject) ? ((GameObject) b).getLayer() : 0;
-				if (la != lb)
-					return Integer.compare(la, lb);
-
-				Point2D pa = (a instanceof GameObject) ? ((GameObject) a).getPosition() : null;
-				Point2D pb = (b instanceof GameObject) ? ((GameObject) b).getPosition() : null;
-				if (pa == null || pb == null)
-					return 0;
-				if (pa.getY() != pb.getY())
-					return Integer.compare(pa.getY(), pb.getY());
-				return Integer.compare(pa.getX(), pb.getX());
-			}
-		});
-
-		return list;
-	}
-
-	public List<GameObject> getGameObjects() {
-		return new ArrayList<>(objects);
-	}
-
-	public BigFish getBigFish() {
-		return bigFish;
-	}
-
-	public SmallFish getSmallFish() {
-		return smallFish;
-	}
-
-	public void setBigFish(BigFish b) {
-		this.bigFish = b;
-	}
-
-	public void setSmallFish(SmallFish s) {
-		this.smallFish = s;
-	}
-
-	public String getName() {
-		return name;
-	}
-
-	/**
-	 * Retorna o GameObject de mais alta layer na posição indicada (x,y), ou null se
-	 * não houver objecto nessa posição.
-	 */
-	public GameObject getTopObjectAt(Point2D p) {
-		GameObject top = null;
-		for (GameObject go : objects) {
-			if (go.getPosition() != null && go.getPosition().getX() == p.getX()
-					&& go.getPosition().getY() == p.getY()) {
-				if (top == null || go.getLayer() >= top.getLayer()) {
-					top = go;
-				}
-			}
-		}
-		return top;
-	}
-
-	/**
-	 * Verifica se a posição está dentro dos limites visíveis (delegate para
-	 * ImageGUI). Se ImageGUI não estiver inicializada, assume true para evitar
-	 * NPEs.
-	 */
-	public boolean isInsideBounds(Point2D p) {
-		try {
-			if (ImageGUI.getInstance() != null) {
-				return ImageGUI.getInstance().isWithinBounds(p);
-			}
-		} catch (Exception e) {
-			// ignora e considera in-bounds
-		}
-		return true;
-	}
-	
-	/**
-     * Retorna todos os GameObjects que estão na posição p.
-     * Útil para gravidade no checkpoint seguinte.
-     */
-    public List<GameObject> getObjectsAt(Point2D p) {
-        List<GameObject> list = new ArrayList<>();
-        for (GameObject go : objects) {
-            if (go.getPosition() != null && go.getPosition().equals(p))
-                list.add(go);
+                        if (go instanceof BigFish)
+                            room.bigFish = (BigFish) go;
+                        if (go instanceof SmallFish)
+                            room.smallFish = (SmallFish) go;
+                    }
+                }
+                y++;
+            }
+        } catch (Exception e) {
+            System.err.println("Erro a ler sala: " + e.getMessage());
+            return null;
         }
+
+        return room;
+    }
+
+    /* ---------------------------------------------------------
+     * GUI
+     * --------------------------------------------------------- */
+    public List<ImageTile> getObjects() {
+        List<ImageTile> list = new ArrayList<>(imageTiles);
+
+        list.sort((a, b) -> {
+            int la = (a instanceof GameObject) ? ((GameObject)a).getLayer() : 0;
+            int lb = (b instanceof GameObject) ? ((GameObject)b).getLayer() : 0;
+            if (la != lb)
+                return Integer.compare(la, lb);
+
+            Point2D pa = (a instanceof GameObject) ? ((GameObject)a).getPosition() : null;
+            Point2D pb = (b instanceof GameObject) ? ((GameObject)b).getPosition() : null;
+            if (pa == null || pb == null) return 0;
+
+            if (pa.getY() != pb.getY())
+                return Integer.compare(pa.getY(), pb.getY());
+
+            return Integer.compare(pa.getX(), pb.getX());
+        });
+
         return list;
     }
-    
+
+    /* ---------------------------------------------------------
+     * GETTERS
+     * --------------------------------------------------------- */
+    public List<GameObject> getGameObjects() {
+        return new ArrayList<>(objects);
+    }
+
+    public BigFish getBigFish() { return bigFish; }
+    public SmallFish getSmallFish() { return smallFish; }
+
+    public void setBigFish(BigFish b) { bigFish = b; }
+    public void setSmallFish(SmallFish s) { smallFish = s; }
+
+    /* ---------------------------------------------------------
+     * UTILIDADES DE CELULAS
+     * --------------------------------------------------------- */
+    public GameObject getTopObjectAt(Point2D p) {
+        GameObject top = null;
+        for (GameObject go : objects) {
+            if (go.getPosition() != null && go.getPosition().equals(p)) {
+                if (top == null || go.getLayer() >= top.getLayer())
+                    top = go;
+            }
+        }
+        return top;
+    }
+
+    public List<GameObject> getObjectsAt(Point2D p) {
+        List<GameObject> l = new ArrayList<>();
+        for (GameObject go : objects) {
+            if (go.getPosition() != null && go.getPosition().equals(p))
+                l.add(go);
+        }
+        return l;
+    }
+
+    public boolean isInsideBounds(Point2D p) {
+        try {
+            if (ImageGUI.getInstance() != null)
+                return ImageGUI.getInstance().isWithinBounds(p);
+        } catch (Exception ignored) {}
+        return true;
+    }
+
+    /* ---------------------------------------------------------
+     * REMOVER OBJETO
+     * --------------------------------------------------------- */
+    public void removeObject(GameObject obj) {
+        if (obj == null) return;
+        while (objects.remove(obj)) {}
+        while (imageTiles.remove(obj)) {}
+
+        if (obj == bigFish) bigFish = null;
+        if (obj == smallFish) smallFish = null;
+    }
+
+    /* ---------------------------------------------------------
+     * MOVER OBJETO
+     * --------------------------------------------------------- */
     public void moveObject(GameObject obj, Point2D to) {
         obj.setPosition(to);
     }
-    
-	// Room.java
-	public void removeObject(GameObject obj) {
-		if (obj == null)
-			return;
-		while (objects.remove(obj)) {
-		}
-		while (imageTiles.remove(obj)) {
-		}
-		if (obj instanceof BigFish && bigFish == obj)
-			bigFish = null;
-		if (obj instanceof SmallFish && smallFish == obj)
-			smallFish = null;
-		try {
-			if (ImageGUI.getInstance() != null)
-				ImageGUI.getInstance().update();
-		} catch (Exception ignored) {
-		}
-	}
-	
-	public void applyGravity() {
-		// snapshot para processar um tick sem efeitos em cadeia imediatos
-		List<GameObject> snapshot = new ArrayList<>(objects);
-		Map<GameObject, Point2D> origPos = new HashMap<>();
-		for (GameObject go : snapshot)
-			origPos.put(go, go.getPosition());
 
-		for (GameObject go : snapshot) {
-			Point2D startPos = origPos.get(go);
-			if (startPos == null)
-				continue;
-			if (go.getPosition() == null)
-				continue;
-			if (!go.getPosition().equals(startPos))
-				continue;
+    /* ---------------------------------------------------------
+     * GRAVIDADE COM CONTAGEM DE HEAVIES ACIMA
+     * --------------------------------------------------------- */
+    public void applyGravity() {
 
-			// só para movables com peso
-			if (!(go instanceof Movable))
-				continue;
-			GameObject.Weight w = go.getWeight();
-			if (w == GameObject.Weight.NONE)
-				continue;
+        List<GameObject> snapshot = new ArrayList<>(objects);
+        Map<GameObject, Point2D> origPos = new HashMap<>();
+        for (GameObject g : snapshot)
+            origPos.put(g, g.getPosition());
 
-			Point2D below = new Point2D(startPos.getX(), startPos.getY() + 1);
+        for (GameObject go : snapshot) {
 
-			if (!isInsideBounds(below))
-				continue;
+            Point2D start = origPos.get(go);
+            if (start == null) continue;
+            if (go.getPosition() == null) continue;
 
-			// --- novo: obter todos os objectos nessa célula (não só o 'top')
-			List<GameObject> cellObjs = getObjectsAt(below); // implementa getObjectsAt se ainda não tens
+            // já moveu este tick
+            if (!go.getPosition().equals(start)) continue;
 
-			// 1) se existir algum GameCharacter nessa célula -> trata como vítima
-			boolean killedSomeone = false;
-			for (GameObject cellObj : cellObjs) {
-				if (cellObj instanceof GameCharacter) {
-					GameCharacter victim = (GameCharacter) cellObj;
-					// podes decidir aqui se apenas HEAVY mata. Exemplo: só HEAVY mata:
-					if (w == GameObject.Weight.HEAVY) {
-						victim.die(); // deve remover do Room (ou faz removeObject depois)
-						// garante que a lista interna é atualizada
-						removeObject(victim);
-						killedSomeone = true;
-					} else {
-						// se quiseres que LIGHT também mate, descomenta estas linhas:
-						// victim.die(); removeObject(victim); killedSomeone = true;
-					}
-				}
-			}
+            // não móvel → ignora
+            if (!(go instanceof Movable)) continue;
+            GameObject.Weight w = go.getWeight();
+            if (w == GameObject.Weight.NONE) continue;
 
-			if (killedSomeone) {
-				// desloca o objecto para a célula onde o(s) peixe(s) estavam
-				moveObject(go, below);
-				if (go instanceof Movable)
-					((Movable) go).onFall(this);
-				continue;
-			}
+            // SE HÁ PERSONAGEM NA MESMA CÉLULA → NÃO CAI MAIS
+            boolean characterInStart = false;
+            for (GameObject obj : getObjectsAt(start)) {
+                if (obj instanceof GameCharacter) {
+                    characterInStart = true;
+                    break;
+                }
+            }
+            if (characterInStart) continue;
 
-			// 2) se não houver personagem, procede como antes:
-			// verifica top na célula (o teu método getTopObjectAt continua válido)
-			GameObject top = getTopObjectAt(below);
+            Point2D below = new Point2D(start.getX(), start.getY() + 1);
+            if (!isInsideBounds(below)) continue;
 
-			if (top == null) {
-				moveObject(go, below);
-				if (go instanceof Movable)
-					((Movable) go).onFall(this);
-				continue;
-			}
+            List<GameObject> cell = getObjectsAt(below);
 
-			// se o top for transponível (por ex. water com isTransposable()=true)
-			if (top.isTransposable()) {
-				moveObject(go, below);
-				if (go instanceof Movable)
-					((Movable) go).onFall(this);
-				continue;
-			}
+            int movableCount = 0;
+            int heavyCount = 0;
 
-			// caso contrário -> bloqueado
-		}
-	}
+            for (GameObject obj : cell) {
+                if (obj instanceof Movable) {
+                    movableCount++;
+                    if (obj.getWeight() == GameObject.Weight.HEAVY)
+                        heavyCount++;
+                }
+            }
+
+            int newMovable = movableCount + 1;
+            int newHeavy = heavyCount + (w == GameObject.Weight.HEAVY ? 1 : 0);
+
+            GameCharacter character = null;
+            for (GameObject obj : cell) {
+                if (obj instanceof GameCharacter) {
+                    character = (GameCharacter) obj;
+                    break;
+                }
+            }
+
+            if (character != null) {
+
+                boolean dies = false;
+
+                // regras SmallFish
+                if (character instanceof SmallFish) {
+                    if (newHeavy > 0) dies = true;
+                    else if (newMovable > 1) dies = true;
+                }
+                // regras BigFish (inicial: conta heavies na célula do peixe)
+                else if (character instanceof BigFish) {
+                    if (newHeavy > 1) dies = true;
+                }
+                // outro personagem
+                else {
+                    if (newMovable > 0) dies = true;
+                }
+
+                // se BigFish sobreviveu à verificação direta, contamos a pilha contígua acima
+                if (!dies && character instanceof BigFish) {
+                    int heaviesAbove = 0;
+
+                    // começamos em 'start' (célula imediatamente acima do peixe)
+                    Point2D cur = new Point2D(start.getX(), start.getY());
+
+                    while (isInsideBounds(cur)) {
+                        List<GameObject> objsHere = getObjectsAt(cur);
+                        boolean foundMovable = false;
+                        for (GameObject o : objsHere) {
+                            if (o instanceof Movable) {
+                                foundMovable = true;
+                                // se for o próprio go já em objsHere, evitamos dupla contagem:
+                                if (o == go) {
+                                    if (go.getWeight() == GameObject.Weight.HEAVY) {
+                                        heaviesAbove++;
+                                    }
+                                } else {
+                                    if (o.getWeight() == GameObject.Weight.HEAVY) {
+                                        heaviesAbove++;
+                                    }
+                                }
+                            }
+                        }
+
+                        // Se não encontrou movables nesta célula, a pilha contígua termina
+                        if (!foundMovable) break;
+
+                        // sobe uma célula (y-1)
+                        cur = new Point2D(cur.getX(), cur.getY() - 1);
+                    }
+
+                    // se existem 2 ou mais heavies empilhados imediatamente acima do peixe -> morre
+                    if (heaviesAbove >= 2) {
+                        dies = true;
+                    }
+                }
+
+                if (dies) {
+                    // personagem morre → objeto entra na célula
+                    character.die();
+                    removeObject(character);
+                    moveObject(go, below);
+                    continue;
+                } else {
+                    // personagem sobrevive → objeto fica NA CÉLULA DE CIMA (start)
+                    continue;
+                }
+            }
+
+            // queda normal
+            GameObject top = getTopObjectAt(below);
+
+            if (top == null || top.isTransposable()) {
+                moveObject(go, below);
+                continue;
+            }
+        }
+    }
 }
-                
