@@ -33,124 +33,151 @@ public abstract class GameCharacter extends GameObject {
         return alive;
     }
     
-    /**
-     * Move a personagem segundo um delta, aplicando regras de colisão:
-     * 1) não sai dos limites
-     * 2) move se célula vazia
-     * 3) move se o tile for Passable e autorizar esta personagem
-     * 4) move se o tile for transponível
-     * 5) senão, bloqueia
-     */
     @Override
-	public void move(Vector2D delta) {
+    public void move(pt.iscte.poo.utils.Vector2D delta) {
+        if (delta == null) return;
+        Room r = getRoom();
+        if (r == null) return;
 
-		Room r = getRoom();
-		if (r == null || delta == null)
-			return;
+        Point2D dest = getPosition().plus(delta);
+        if (!r.isInsideBounds(dest)) return;
 
-		Point2D dest = getPosition().plus(delta);
+        GameObject top = r.getTopObjectAt(dest);
 
-		if (!r.isInsideBounds(dest))
-			return;
+        // ---------------------------------------------------------
+        // 1) CÉLULA VAZIA → MOVE
+        // ---------------------------------------------------------
+        if (top == null) {
+            r.moveObject(this, dest);
+            return;
+        }
 
-		GameObject top = r.getTopObjectAt(dest);
+        // ---------------------------------------------------------
+        // 2) PASSABLE (Hollow Wall) → depende do peixe
+        // ---------------------------------------------------------
+        if (top instanceof objects.Passable) {
+            if (((objects.Passable) top).canPass(this)) {
+                r.moveObject(this, dest);
+            }
+            return; // se não puder passar, bloqueia
+        }
 
-		// 1) célula vazia -> mover via Room
-		if (top == null) {
-			r.moveObject(this, dest);
-			return;
-		}
+        // ---------------------------------------------------------
+        // 3) OBJETO TRANSPONÍVEL (ex: water)
+        // ---------------------------------------------------------
+        if (top.isTransposable()) {
+            r.moveObject(this, dest);
+            return;
+        }
 
-		// 2) Passable (ex.: HoleWall que permite passagem)
-		if (top instanceof Passable) {
-			if (((Passable) top).canPass(this)) {
-				r.moveObject(this, dest);
-				return;
-			}
-		}
+        // ---------------------------------------------------------
+        // 4) TENTAR EMPURRAR
+        //     -> construir cadeia de Movables
+        // ---------------------------------------------------------
+        List<GameObject> chain = new ArrayList<>();
+        Point2D cur = dest;
 
-		// 3) transponível (genérico)
-		if (top.isTransposable()) {
-			r.moveObject(this, dest);
-			return;
-		}
+        while (true) {
+            if (!r.isInsideBounds(cur)) break;
 
-		// 4) tentar empurrar em cadeia se houver movables consecutivos na direção delta
-		// (somente horizontal push faz sentido para cadeias, mas esta versão funciona
-		// em qualquer direção)
-		// coletar cadeia de movables começando em dest
-		List<GameObject> chain = new ArrayList<>();
-		Point2D cur = new Point2D(dest.getX(), dest.getY());
-		while (true) {
-			if (!r.isInsideBounds(cur))
-				break;
-			GameObject g = r.getTopObjectAt(cur);
-			if (g == null || !(g instanceof Movable))
-				break;
-			chain.add(g);
-			// avança uma célula na direção delta
-			cur = cur.plus(delta);
-		}
+            GameObject g = r.getTopObjectAt(cur);
+            if (g == null) break;
+            if (!(g instanceof Movable)) break;
 
-		// se nao há movables inchain, não é pushable neste ramo
-		if (chain.isEmpty()) {
-			// nada a fazer, bloqueado
-			return;
-		}
+            chain.add(g);
+            cur = cur.plus(delta); // avança na direção do movimento
+        }
 
-		Point2D beyond = new Point2D(cur.getX(), cur.getY()); // célula logo após a cadeia
+        if (chain.isEmpty()) {
+            return; // nada empurrável → bloqueado
+        }
 
-		// beyond precisa estar valid e livre/transponível
-		if (!r.isInsideBounds(beyond))
-			return;
-		GameObject beyondTop = r.getTopObjectAt(beyond);
-		if (!(beyondTop == null || beyondTop.isTransposable())) {
-			// não há espaço para empurrar
-			return;
-		}
+        Point2D beyond = cur;
+        if (!r.isInsideBounds(beyond)) return;
 
-		// regra para SmallFish: só permite empurrar cadeia se for exatamente 1 elemento
-		// e LIGHT
-		if (this instanceof SmallFish) {
-			if (chain.size() == 1) {
-				GameObject only = chain.get(0);
-				if (only.getWeight() == GameObject.Weight.LIGHT) {
-					// empurra
-					// mover o objeto (apenas 1) para beyond
-					r.moveObject(only, beyond);
-					// mover o peixe para dest
-					r.moveObject(this, dest);
-				}
-			}
-			return;
-		}
+        GameObject beyondTop = r.getTopObjectAt(beyond);
+        boolean beyondFree =
+                (beyondTop == null)
+                || beyondTop.isTransposable()
+                || (beyondTop instanceof objects.Passable
+                    && ((objects.Passable)beyondTop).canPass(this));
 
-		// regra para BigFish (ou outras personagens que suportam empurrar cadeias):
-		if (this instanceof BigFish) {
-			// conta heavies na cadeia
-			int heavyCount = 0;
-			for (GameObject c : chain) {
-				if (c.getWeight() == GameObject.Weight.HEAVY)
-					heavyCount++;
-			}
-			// BigFish pode empurrar a cadeia se heavyCount <= 1
-			if (heavyCount <= 1) {
-				// empurra a cadeia inteira: mover do fim para o início para evitar sobreposição
-				for (int i = chain.size() - 1; i >= 0; i--) {
-					GameObject obj = chain.get(i);
-					Point2D from = obj.getPosition();
-					Point2D to = from.plus(delta);
-					r.moveObject(obj, to);
-				}
-				// agora move o peixe
-				r.moveObject(this, dest);
-			}
-			return;
-		}
+        if (!beyondFree) return;
 
-		// outros tipos de personagens: por omissão não empurram cadeias
-	}
-    
+        // ---------------------------------------------------------
+        // CONTAGEM DE HEAVIES NA CADEIA
+        // ---------------------------------------------------------
+        int heavyCount = 0;
+        for (GameObject obj : chain) {
+            if (obj.getWeight() == GameObject.Weight.HEAVY) {
+                heavyCount++;
+            }
+        }
+
+        boolean horizontal = (delta.getY() == 0 && delta.getX() != 0);
+        boolean vertical   = (delta.getX() == 0 && delta.getY() != 0);
+
+        // ---------------------------------------------------------
+        // 5) REGRAS DO SMALLFISH
+        // ---------------------------------------------------------
+        if (this instanceof objects.SmallFish) {
+
+            // No máximo UM objeto
+            if (chain.size() != 1) return;
+
+            GameObject only = chain.get(0);
+
+            // SmallFish só empurra LIGHT
+            if (only.getWeight() != GameObject.Weight.LIGHT) return;
+
+            // horizontal OU vertical — empurra 1 light
+            Point2D objTo = only.getPosition().plus(delta);
+            r.moveObject(only, objTo);
+            r.moveObject(this, dest);
+            return;
+        }
+
+        // ---------------------------------------------------------
+        // 6) REGRAS DO BIGFISH
+        // ---------------------------------------------------------
+        if (this instanceof objects.BigFish) {
+
+            // BigFish NÃO atravessa hole walls (já tratado)
+        	// --- bloco horizontal para BigFish (substituir o anterior) ---
+        	if (horizontal) {
+        	    // Permitir empurrar cadeia de qualquer tamanho (sem restrição de heavies)
+        	    // Desde que o espaço "beyond" esteja livre/transponível/passable (já verificado antes)
+
+        	    // mover do fim da cadeia para o início para evitar overlap
+        	    for (int i = chain.size() - 1; i >= 0; i--) {
+        	        GameObject obj = chain.get(i);
+        	        Point2D objTo = obj.getPosition().plus(delta);
+        	        r.moveObject(obj, objTo);
+        	    }
+
+        	    // finalmente mover o peixe
+        	    r.moveObject(this, dest);
+        	    return;
+        	}
+
+
+            // BigFish → empurrar vertical apenas 1 objeto (light ou heavy)
+            if (vertical) {
+                if (chain.size() != 1) return;
+
+                GameObject obj = chain.get(0);
+                Point2D objTo = obj.getPosition().plus(delta);
+                r.moveObject(obj, objTo);
+                r.moveObject(this, dest);
+                return;
+            }
+
+            return; // diagonais não suportadas
+        }
+
+        // Outros personagens não empurram
+    }
+
 	public void die() {
 		if (!alive)
 			return;
