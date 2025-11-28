@@ -1,19 +1,29 @@
 package objects;
 
 import pt.iscte.poo.game.Room;
+import pt.iscte.poo.utils.Point2D;
 
-public interface Movable {
+/**
+ * Movable: classe abstrata base para objectos móveis.
+ * NOTA: onFall por omissão NÃO contém lógica. Cada subclasse implementa o seu comportamento.
+ */
+public abstract class Movable extends GameObject {
 
-	default boolean canBePushedBy(GameCharacter c) {
-        if (c == null) return false;
-        if (!(this instanceof GameObject)) return false;
-
-        GameObject g = (GameObject) this;
-        return c.canPushWeight(g.getWeight());
-    }
-	
-	default void onFall(Room room) {
-        // comportamento por omissão: nada
+    public Movable(Point2D position, Room room) {
+        super(position, room);
     }
 
+    public Movable(Room room) {
+        super(room);
+    }
+
+    public boolean canBePushedBy(GameCharacter c) {
+        if (c == null)
+            return false;
+        return c.canPushWeight(this.getWeight());
+    }
+
+    public void onFall(Room room, Point2D from, Point2D to) {
+        // default: no-op
+    }
 }

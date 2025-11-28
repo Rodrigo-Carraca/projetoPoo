@@ -1,8 +1,12 @@
-	package objects;
+package objects;
 	
 	import pt.iscte.poo.utils.Point2D;
 	import pt.iscte.poo.utils.Vector2D;
-	import pt.iscte.poo.game.Room;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import pt.iscte.poo.game.Room;
 	
 	/**
 	 * SmallFish (jogador). Singleton.
@@ -33,15 +37,94 @@
 	
 		@Override
 		public void move(Vector2D delta) {
-		    if (delta == null)
-		        return;
+			if (delta == null)
+				return;
 
-		    if (delta.getX() > 0)
-		        facingRight = true;
-		    else if (delta.getX() < 0)
-		        facingRight = false;
+			// atualizar facing
+			if (delta.getX() > 0)
+				facingRight = true;
+			else if (delta.getX() < 0)
+				facingRight = false;
 
-		    super.move(delta);
+			// guarda posição inicial para saber se super.move já moveu o peixe
+			Point2D start = getPosition();
+
+			// executa a parte comum (move simples se possível)
+			super.move(delta);
+
+			// se super.move alterou a posição, já movemos — nada mais a fazer
+			if (!getPosition().equals(start))
+				return;
+
+			// ---- A partir daqui: super.move não moveu o peixe -> recalcular e aplicar regras específicas
+
+			Room r = getRoom();
+			if (r == null)
+				return;
+
+			Point2D dest = start.plus(delta);
+			if (!r.isInsideBounds(dest))
+				return;
+
+			GameObject top = r.getTopObjectAt(dest);
+			if (top == null) {
+				// caso improvável porque super.move faria isto, mas mantemos coerência
+				r.moveObject(this, dest);
+				return;
+			}
+
+			// se é Passable e pode passar, já teria sido movido por super; se não, bloqueia
+			if (top instanceof Passable) {
+				if (((Passable) top).canPass(this)) {
+					r.moveObject(this, dest);
+				}
+				return;
+			}
+
+			if (top.isTransposable()) {
+				r.moveObject(this, dest);
+				return;
+			}
+
+			// Construir lista de Movables
+			List<GameObject> chain = new ArrayList<>();
+			Point2D cur = dest;
+			while (true) {
+				if (!r.isInsideBounds(cur))
+					break;
+
+				GameObject g = r.getTopObjectAt(cur);
+				if (g == null)
+					break;
+				if (!(g instanceof Movable))
+					break;
+
+				chain.add(g);
+				cur = cur.plus(delta);
+			}
+
+			// SmallFish rules: must be exactly one movable and it must be LIGHT
+			if (chain.size() != 1)
+				return;
+
+			GameObject only = chain.get(0);
+			if (only.getWeight() != GameObject.Weight.LIGHT)
+				return;
+
+			Point2D beyond = cur;
+			if (!r.isInsideBounds(beyond))
+				return;
+
+			GameObject beyondTop = r.getTopObjectAt(beyond);
+			boolean beyondFree = (beyondTop == null) || beyondTop.isTransposable()
+					|| (beyondTop instanceof Passable && ((Passable) beyondTop).canPass(this));
+			if (!beyondFree)
+				return;
+
+			// Empurra o único objeto (horizontal ou vertical) e move o peixe
+			Point2D objTo = only.getPosition().plus(delta);
+			r.moveObject(only, objTo);
+			r.moveObject(this, dest);
 		}
 	
 		@Override

@@ -4,7 +4,7 @@ import pt.iscte.poo.utils.Point2D;
 import pt.iscte.poo.utils.Vector2D;
 import pt.iscte.poo.game.Room;
 
-public class Log extends GameObject implements Movable {
+public class Log extends Movable implements Crushable {
 	public Log(Point2D p, Room r) {
 		super(p, r);
 	}
@@ -37,5 +37,10 @@ public class Log extends GameObject implements Movable {
 	public Weight getWeight() {
 		// TODO Auto-generated method stub
 		return Weight.LIGHT;
+	}
+
+	@Override
+	public void onCrushedBy(Room room, GameObject crusher, Point2D pos) {
+		room.removeObject(this);
 	}
 }
