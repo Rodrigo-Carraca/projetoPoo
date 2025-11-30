@@ -13,6 +13,8 @@ import objects.BigFish;
 import objects.SmallFish;
 import objects.Movable;
 import objects.GameCharacter;
+import objects.Crushable;
+
 
 public class Room {
 
@@ -150,18 +152,33 @@ public class Room {
 	}
 
 	public void removeObject(GameObject obj) {
-		if (obj == null)
-			return;
-		while (objects.remove(obj)) {
-		}
-		while (imageTiles.remove(obj)) {
-		}
+	    if (obj == null)
+	        return;
 
-		if (obj == bigFish)
-			bigFish = null;
-		if (obj == smallFish)
-			smallFish = null;
+	    // remover de objects
+	    while (objects.remove(obj)) {
+	    }
+	    // remover de imageTiles
+	    while (imageTiles.remove(obj)) {
+	    }
+
+	    // se era um peixe, limpar referência
+	    if (obj == bigFish)
+	        bigFish = null;
+	    if (obj == smallFish)
+	        smallFish = null;
+
+	    // Tentar também remover a imagem da GUI e forçar update.
+	    try {
+	        if (ImageGUI.getInstance() != null) {
+	            // removeImage tende a ser mais seguro do que clear/addImages em termos de flicker
+	            ImageGUI.getInstance().removeImage(obj);
+	            ImageGUI.getInstance().update();
+	        }
+	    } catch (Exception ignored) {
+	    }
 	}
+
 
 	public void moveObject(GameObject obj, Point2D to) {
 		obj.setPosition(to);
@@ -182,18 +199,18 @@ public class Room {
 	        if (go.getPosition() == null)
 	            continue;
 
-	        // já moveu este tick
+	        // Já moveu este tick?
 	        if (!go.getPosition().equals(start))
 	            continue;
 
-	        // não móvel → ignora
+	        // Só nos interessa Movable com peso
 	        if (!(go instanceof Movable))
 	            continue;
 	        GameObject.Weight w = go.getWeight();
 	        if (w == GameObject.Weight.NONE)
 	            continue;
 
-	        // SE HÁ PERSONAGEM NA MESMA CÉLULA → NÃO CAI MAIS
+	        // Se há personagem na mesma célula → não cai
 	        boolean characterInStart = false;
 	        for (GameObject obj : getObjectsAt(start)) {
 	            if (obj instanceof GameCharacter) {
@@ -208,11 +225,24 @@ public class Room {
 	        if (!isInsideBounds(below))
 	            continue;
 
-	        // Delegar ao objecto móvel: cabe-lhe decidir mover, explodir, esmagar, etc.
+	        // Obter o objecto top na célula de baixo
+	        GameObject topBelow = getTopObjectAt(below);
+
+	        // --- Caso ESPECIAL: heavy a cair sobre um Crushable -> esmagamento
+	        if (w == GameObject.Weight.HEAVY && topBelow instanceof Crushable) {
+	            try {
+	                ((Crushable) topBelow).onCrushedBy(this, go, below);
+	            } catch (Exception ignored) {
+	            }
+	            // mover o objeto pesado para a célula abaixo (após esmagamento)
+	            moveObject(go, below);
+	            continue;
+	        }
+
+	        // Caso normal: delegar ao comportamento do objeto (onFall)
 	        try {
 	            ((Movable) go).onFall(this, start, below);
-	        } catch (Exception e) {
-	            System.err.println("Erro em onFall para " + go.getName() + ": " + e.getMessage());
+	        } catch (Exception ignored) {
 	        }
 	    }
 	}
