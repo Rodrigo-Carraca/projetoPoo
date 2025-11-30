@@ -154,4 +154,8 @@ import pt.iscte.poo.game.Room;
 			// TODO Auto-generated method stub
 			return w == GameObject.Weight.LIGHT;
 		}
+		public static void resetInstance() {
+		    INSTANCE = null;
+		}
+
 	}
