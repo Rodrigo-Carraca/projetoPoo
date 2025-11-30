@@ -15,8 +15,7 @@ import pt.iscte.poo.observer.Observer;
 import pt.iscte.poo.utils.Vector2D;
 
 /**
- * GameEngine - garante que, ao carregar/reset/next-level, as instâncias dos peixes
- * (singletons) ficam correctamente sincronizadas com a Room e com a GUI.
+ * GameEngine — versão final para alternância correta de personagens com SPACE.
  */
 public class GameEngine implements Observer {
 
@@ -41,17 +40,20 @@ public class GameEngine implements Observer {
         if (currentRoom == null && !rooms.isEmpty())
             currentRoom = rooms.values().iterator().next();
 
-        // associar room às instâncias (defensivo)
+        // associar room às instâncias singletons (defensivo)
         try { if (SmallFish.getInstance() != null) SmallFish.getInstance().setRoom(currentRoom); } catch (Throwable ignored) {}
         try { if (BigFish.getInstance() != null) BigFish.getInstance().setRoom(currentRoom); } catch (Throwable ignored) {}
 
-        normalizeControlled();
+        // seleccionar controlado inicial (prefere BigFish se ambos estiverem indisponíveis controlado fica null)
+        pickInitialControlled();
+
         updateStatusMessage();
         updateGUI();
     }
 
     private void loadGame() {
-        File[] files = new File("./rooms").listFiles();
+        File folder = new File("./rooms");
+        File[] files = (folder.exists()) ? folder.listFiles() : null;
         if (files == null) return;
         for (File f : files) {
             if (!f.isFile() || !f.getName().endsWith(".txt")) continue;
@@ -63,43 +65,51 @@ public class GameEngine implements Observer {
     @Override
     public void update(Observed source) {
 
-        // input teclado
+        // 1) Input do utilizador
         if (ImageGUI.getInstance().wasKeyPressed()) {
             int k = ImageGUI.getInstance().keyPressed();
 
             if (k == KeyEvent.VK_SPACE) {
+                // Alterna entre peixes disponíveis imediatamente
                 toggleControlled();
                 updateStatusMessage();
+            } else if (k == KeyEvent.VK_R) {
+                // reiniciar nível manual
+                restartLevel();
             } else {
                 try {
                     Vector2D delta = pt.iscte.poo.utils.Direction.directionFor(k).asVector();
-                    if (controlled != null && !controlled.isOut() && controlled.getRoom() != null) {
+                    if (controlled != null && !controlled.isOut() && controlled.getRoom() != null && controlled.isAlive()) {
                         controlled.move(delta);
                     }
 
-                    // verificar saída imediato e normalizar
+                    // Após mover via teclado, verificar possíveis saídas
                     checkExit(BigFish.getInstance());
                     checkExit(SmallFish.getInstance());
-                    normalizeControlled();
+                    // NOTA: aqui não chamamos normalizeControlled() porque queremos PRESERVAR a escolha do jogador
                     updateStatusMessage();
-                } catch (Exception ignored) {}
+
+                } catch (Exception ignored) {
+                    // tecla não mapeada
+                }
             }
         }
 
-        // ticks / gravidade
+        // 2) Ticks / Gravidade
         int t = ImageGUI.getInstance().getTicks();
         while (lastTickProcessed < t) processTick();
 
-        // forçar update GUI
-        ImageGUI.getInstance().update();
+        // 3) Atualizar GUI
+        try { ImageGUI.getInstance().update(); } catch (Exception ignored) {}
 
-        // pós-gravidade: verificar saídas / normalizar
+        // 4) Pós-gravidade: verificar saídas, e garantir que, se o controlado actual passou a não estar disponível,
+        // escolhemos automaticamente outro (mas sem sobrescrever uma escolha válida do jogador).
         try { checkExit(BigFish.getInstance()); } catch (Exception ignored) {}
         try { checkExit(SmallFish.getInstance()); } catch (Exception ignored) {}
-        normalizeControlled();
+        ensureControlledStillValid(); // só altera se o controlado deixou de ser válido
         updateStatusMessage();
 
-        // se algum peixe morreu -> reiniciar
+        // 5) Reinício se algum peixe morreu
         SmallFish sf = SmallFish.getInstance();
         BigFish bf = BigFish.getInstance();
         if ((sf != null && !sf.isAlive()) || (bf != null && !bf.isAlive())) {
@@ -107,7 +117,7 @@ public class GameEngine implements Observer {
             return;
         }
 
-        // se ambos saíram -> next level
+        // 6) Verificar se ambos saíram -> avançar nível
         checkLevelCompletion();
     }
 
@@ -116,6 +126,7 @@ public class GameEngine implements Observer {
         if (currentRoom != null) currentRoom.applyGravity();
     }
 
+    /** Reconstrói a GUI a partir dos imageTiles da currentRoom. */
     public void updateGUI() {
         if (currentRoom != null) {
             try {
@@ -127,34 +138,79 @@ public class GameEngine implements Observer {
         }
     }
 
+    /**
+     * Alterna o personagem controlado pelo jogador (SPACE).
+     * - Se ambos disponíveis: alterna.
+     * - Se apenas um disponível: escolhe esse (ou mantém).
+     * - Se nenhum disponível: controlled = null.
+     */
     private void toggleControlled() {
         GameCharacter big = BigFish.getInstance();
         GameCharacter small = SmallFish.getInstance();
 
-        if (controlled == null) {
-            if (big != null && !big.isOut() && big.getRoom() != null) controlled = big;
-            else if (small != null && !small.isOut() && small.getRoom() != null) controlled = small;
-            else controlled = null;
+        boolean bigAvailable = big != null && big.isAlive() && !big.isOut() && big.getRoom() != null;
+        boolean smallAvailable = small != null && small.isAlive() && !small.isOut() && small.getRoom() != null;
+
+        // nenhum disponível
+        if (!bigAvailable && !smallAvailable) {
+            controlled = null;
             return;
         }
 
-        if (controlled == big) {
-            if (small != null && !small.isOut() && small.getRoom() != null) controlled = small;
-            else if (big != null && !big.isOut() && big.getRoom() != null) controlled = big;
-            else controlled = null;
-        } else {
-            if (big != null && !big.isOut() && big.getRoom() != null) controlled = big;
-            else if (small != null && !small.isOut() && small.getRoom() != null) controlled = small;
-            else controlled = null;
+        // se controlado actual é null -> escolhe preferencialmente big
+        if (controlled == null) {
+            if (bigAvailable) { controlled = big; return; }
+            if (smallAvailable) { controlled = small; return; }
         }
+
+        // se controlado actual não é mais válido -> escolher outro disponível
+        if (controlled != null && (!controlled.isAlive() || controlled.isOut() || controlled.getRoom() == null)) {
+            if (bigAvailable) { controlled = big; return; }
+            if (smallAvailable) { controlled = small; return; }
+            controlled = null;
+            return;
+        }
+
+        // se ambos disponíveis -> alterna
+        if (bigAvailable && smallAvailable) {
+            if (controlled == big) controlled = small;
+            else controlled = big;
+            return;
+        }
+
+        // caso apenas um disponível -> escolhe esse
+        if (bigAvailable) controlled = big;
+        else if (smallAvailable) controlled = small;
     }
 
-    private void normalizeControlled() {
+    /**
+     * Garante que o personagem actualmente controlado ainda é válido.
+     * Se não for, escolhe automaticamente outro (prefere BigFish).
+     * IMPORTANT: NÃO sobrescreve a escolha do jogador se esta ainda for válida.
+     */
+    private void ensureControlledStillValid() {
+        if (controlled == null) {
+            pickInitialControlled();
+            return;
+        }
+        // se o controlado actual ainda é válido, não faz nada
+        if (controlled.isAlive() && !controlled.isOut() && controlled.getRoom() != null) {
+            return;
+        }
+        // senão escolhe outro disponível (prefere BigFish)
+        pickInitialControlled();
+    }
+
+    /** Escolhe o personagem inicial (prefere BigFish) — usado apenas quando current==null ou inválido. */
+    private void pickInitialControlled() {
         GameCharacter big = BigFish.getInstance();
         GameCharacter small = SmallFish.getInstance();
 
-        if (big != null && !big.isOut() && big.getRoom() != null) { controlled = big; return; }
-        if (small != null && !small.isOut() && small.getRoom() != null) { controlled = small; return; }
+        boolean bigAvailable = big != null && big.isAlive() && !big.isOut() && big.getRoom() != null;
+        boolean smallAvailable = small != null && small.isAlive() && !small.isOut() && small.getRoom() != null;
+
+        if (bigAvailable) { controlled = big; return; }
+        if (smallAvailable) { controlled = small; return; }
         controlled = null;
     }
 
@@ -167,25 +223,32 @@ public class GameEngine implements Observer {
 
     /**
      * Marca peixe como "out" quando: sem room OR posição fora dos limites fixos 10x10.
+     * Remove imagem e desliga room/posição para não bloquear.
      */
     private void checkExit(GameCharacter fish) {
         if (fish == null) return;
         if (fish.isOut()) return;
 
+        // sem room => out
         if (fish.getRoom() == null) {
             fish.setOut(true);
             try { ImageGUI.getInstance().removeImage(fish); } catch (Exception ignored) {}
             return;
         }
+
+        // posição nula => out
         if (fish.getPosition() == null) {
             fish.setOut(true);
             try { ImageGUI.getInstance().removeImage(fish); } catch (Exception ignored) {}
             try { fish.setPosition(new pt.iscte.poo.utils.Point2D(-1, -1)); fish.setRoom(null); } catch (Throwable ignored) {}
             return;
         }
+
+        // limites fixos 10x10
         int x = fish.getPosition().getX();
         int y = fish.getPosition().getY();
         boolean inside10x10 = (x >= 0 && x < 10 && y >= 0 && y < 10);
+
         if (!inside10x10) {
             fish.setOut(true);
             try { ImageGUI.getInstance().removeImage(fish); } catch (Exception ignored) {}
@@ -193,6 +256,7 @@ public class GameEngine implements Observer {
         }
     }
 
+    /** Se ambos os peixes estão out (ou não existem), avança para o próximo nível. */
     private void checkLevelCompletion() {
         BigFish big = BigFish.getInstance();
         SmallFish small = SmallFish.getInstance();
@@ -200,14 +264,16 @@ public class GameEngine implements Observer {
         boolean bigOut = (big == null || big.isOut());
         boolean smallOut = (small == null || small.isOut());
 
-        if (bigOut && smallOut) loadNextLevel();
+        if (bigOut && smallOut) {
+            loadNextLevel();
+        }
     }
 
     /**
-     * Carrega room{current+1}.txt. Garante criação/sincronização dos singletons dos peixes.
+     * Avança para room{current+1}.txt. Reseta singletons antes de ler a nova room
+     * e garante sincronização entre as instâncias e a GUI.
      */
     private void loadNextLevel() {
-        // inferir nível actual
         int currentLevel = 0;
         if (currentRoom != null && currentRoom.getName() != null) {
             try {
@@ -215,14 +281,15 @@ public class GameEngine implements Observer {
                 if (!digits.isEmpty()) currentLevel = Integer.parseInt(digits);
             } catch (Exception ignored) {}
         }
+
         int nextLevel = currentLevel + 1;
         String nextName = "room" + nextLevel + ".txt";
 
-        // reset singletons antes de ler a nova room
+        // reset singletons antes de ler nova room
         try { BigFish.resetInstance(); } catch (Throwable ignored) {}
         try { SmallFish.resetInstance(); } catch (Throwable ignored) {}
 
-        // tentar obter da cache ou ler do disco
+        // obter da cache ou ler do disco
         Room next = rooms.get(nextName);
         if (next == null) {
             File f = new File("./rooms/" + nextName);
@@ -234,40 +301,33 @@ public class GameEngine implements Observer {
 
         currentRoom = next;
 
-        // -- importante: se a room "local" tem peixes, usar as posições para criar os singletons
+        // sincronizar singletons a partir de instâncias locais na room (se existirem)
         try {
             GameCharacter bfLocal = currentRoom.getBigFish();
-            if (bfLocal != null) {
-                // força criação do singleton apontando para a mesma posição e room
-                BigFish.getInstance(bfLocal.getPosition(), currentRoom);
-            }
+            if (bfLocal != null) BigFish.getInstance(bfLocal.getPosition(), currentRoom);
         } catch (Throwable ignored) {}
-
         try {
             GameCharacter sfLocal = currentRoom.getSmallFish();
-            if (sfLocal != null) {
-                SmallFish.getInstance(sfLocal.getPosition(), currentRoom);
-            }
+            if (sfLocal != null) SmallFish.getInstance(sfLocal.getPosition(), currentRoom);
         } catch (Throwable ignored) {}
 
-        // garantir que singletons (se existirem) têm a room correcta e out=false
+        // garantir estado dos singletons
         try { if (BigFish.getInstance() != null) { BigFish.getInstance().setRoom(currentRoom); BigFish.getInstance().setOut(false); } } catch (Throwable ignored) {}
         try { if (SmallFish.getInstance() != null) { SmallFish.getInstance().setRoom(currentRoom); SmallFish.getInstance().setOut(false); } } catch (Throwable ignored) {}
 
-        // reconstruir GUI imageTiles a partir da room atual (limpar + adicionar)
+        // reconstruir GUI
         try {
             ImageGUI.getInstance().clearImages();
             ImageGUI.getInstance().addImages(currentRoom.getObjects());
             ImageGUI.getInstance().update();
         } catch (Exception ignored) {}
 
-        normalizeControlled();
+        // escolher controlado (se current == null ou inválido)
+        ensureControlledStillValid();
         updateStatusMessage();
     }
 
-    /**
-     * Recarrega a room actual (quando um peixe morre). Reset singletons e relê do disco.
-     */
+    /** Recarrega a room actual (quando um peixe morre). Reset singletons e relê do disco. */
     private void restartLevel() {
         String roomName = (currentRoom != null && currentRoom.getName() != null) ? currentRoom.getName() : "room0.txt";
 
@@ -283,7 +343,7 @@ public class GameEngine implements Observer {
         rooms.put(roomName, r);
         currentRoom = r;
 
-        // sincronizar singletons usando posições da room lida
+        // sincronizar singletons pela room recarregada
         try {
             GameCharacter bfLocal = currentRoom.getBigFish();
             if (bfLocal != null) BigFish.getInstance(bfLocal.getPosition(), currentRoom);
@@ -299,7 +359,7 @@ public class GameEngine implements Observer {
             ImageGUI.getInstance().update();
         } catch (Exception ignored) {}
 
-        normalizeControlled();
+        ensureControlledStillValid();
         updateStatusMessage();
     }
 
@@ -309,7 +369,7 @@ public class GameEngine implements Observer {
         this.currentRoom = r;
         try { if (SmallFish.getInstance() != null) SmallFish.getInstance().setRoom(r); } catch (Throwable ignored) {}
         try { if (BigFish.getInstance() != null) BigFish.getInstance().setRoom(r); } catch (Throwable ignored) {}
-        normalizeControlled();
+        ensureControlledStillValid();
         updateGUI();
     }
 }
