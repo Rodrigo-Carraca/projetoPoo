@@ -175,4 +175,8 @@ public class BigFish extends GameCharacter {
 		// TODO Auto-generated method stub
 		return w == GameObject.Weight.LIGHT || w == GameObject.Weight.HEAVY;
 	}
+	public static void resetInstance() {
+	    INSTANCE = null;
+	}
+
 }
