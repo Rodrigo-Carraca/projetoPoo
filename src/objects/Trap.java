@@ -136,4 +136,3 @@ public class Trap extends Movable implements Passable {
 		}
 	}
 }
-
