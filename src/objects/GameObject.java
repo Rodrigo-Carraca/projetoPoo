@@ -73,4 +73,3 @@ public abstract class GameObject implements ImageTile {
 	public abstract Weight getWeight();
 
 }
-
