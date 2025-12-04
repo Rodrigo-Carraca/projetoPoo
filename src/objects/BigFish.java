@@ -38,7 +38,6 @@ public class BigFish extends GameCharacter {
 	public void move(Vector2D delta) {
 		if (delta == null)
 			return;
-
 		// atualizar facing
 		if (delta.getX() > 0)
 			facingRight = true;
@@ -138,10 +137,7 @@ public class BigFish extends GameCharacter {
 			r.moveObject(this, dest);
 			return;
 		}
-
-		// outros casos: bloqueia
 	}
-
 
 	@Override
 	public boolean isTransposable() {

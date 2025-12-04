@@ -62,54 +62,87 @@ public class Bomb extends Movable implements Explodable {
 		int bx = center.getX();
 		int by = center.getY();
 
-		// remover objecto central se sólido ou matar peixe se for peixe
+		// --- 1) Remover objecto central se sólido ou matar peixe se for peixe (mas
+		// spawn effect antes)
 		GameObject centerTop = room.getTopObjectAt(center);
 		if (centerTop != null) {
-			if (centerTop instanceof GameCharacter) {
-				((GameCharacter) centerTop).die();
-				room.removeObject(centerTop);
-			} else if (!centerTop.isTransposable()) {
-				room.removeObject(centerTop);
+			try {
+				// spawn effect na célula central (mesmo que seja peixe)
+				Effect fxCenter = new Effect(center, room, "boom", 8);
+				room.addObject(fxCenter);
+			} catch (Throwable ignored) {
+			}
+			try {
+				if (centerTop instanceof GameCharacter) {
+					((GameCharacter) centerTop).die();
+					room.removeObject(centerTop);
+				} else if (!centerTop.isTransposable()) {
+					room.removeObject(centerTop);
+				}
+			} catch (Throwable ignored) {
+			}
+		} else {
+			// mesmo que a célula esteja vazia, podemos deixar um efeito central
+			try {
+				Effect fxCenter = new Effect(center, room, "boom", 8);
+				room.addObject(fxCenter);
+			} catch (Throwable ignored) {
 			}
 		}
 
-		// adjacentes N,S,E,W — removemos sobre uma cópia da lista para evitar
+		// --- 2) adjacentes N,S,E,W — removemos sobre uma cópia da lista para evitar
 		// concurrent modification
 		Point2D[] adj = new Point2D[] { new Point2D(bx, by - 1), new Point2D(bx, by + 1), new Point2D(bx - 1, by),
 				new Point2D(bx + 1, by) };
 
 		for (Point2D p : adj) {
-			List<GameObject> objs = new ArrayList<>(room.getObjectsAt(p)); 
+			if (p == null)
+				continue;
+			if (!room.isInsideBounds(p))
+				continue;
+
+			// spawn visual na célula adjacente (se válida) antes de remover objetos
+			try {
+				Effect fx = new Effect(p, room, "boom", 8);
+				room.addObject(fx);
+			} catch (Throwable ignored) {
+			}
+
+			List<GameObject> objs = new ArrayList<>(room.getObjectsAt(p));
 			for (GameObject o : objs) {
 				if (o == null)
 					continue;
-				// ignorar tiles transposable (ex: água)
-				if (o.isTransposable())
-					continue;
-				if (o instanceof GameCharacter) {
-					((GameCharacter) o).die();
-					room.removeObject(o);
-				} else {
-					room.removeObject(o);
+				try {
+					// ignorar tiles transposable (ex: água)
+					if (o.isTransposable())
+						continue;
+					if (o instanceof GameCharacter) {
+						((GameCharacter) o).die();
+						room.removeObject(o);
+					} else {
+						room.removeObject(o);
+					}
+				} catch (Throwable ignored) {
 				}
 			}
 		}
-		// remover a própria bomba
-		room.removeObject(this);
 
-		// FORÇAR actualização do GUI para refletir imediatamente as remoções.
+		// --- 3) remover a própria bomba
+		try {
+			room.removeObject(this);
+		} catch (Throwable ignored) {
+		}
+
+		// FORÇAR actualização do GUI para refletir imediatamente as remoções/effects.
 		try {
 			if (ImageGUI.getInstance() != null) {
-				// preferível usar updateGUI do motor se quiser re-add imagens a partir da Room
 				try {
 					GameEngine.getInstance().updateGUI();
 				} catch (Exception ignore) {
-					// se falhar (por ex. ambiente de testes) apenas actualizar a GUI directamente
 					ImageGUI.getInstance().update();
 				}
 			}
 		} catch (Exception ignored) {
-			// proteger em ambientes onde GUI não está presente
 		}
 	}
 

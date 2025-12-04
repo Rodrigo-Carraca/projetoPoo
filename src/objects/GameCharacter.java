@@ -52,7 +52,7 @@ public abstract class GameCharacter extends GameObject {
 
         Point2D dest = getPosition().plus(delta);
 
-        // --- USAR limites FIXOS 10x10 
+        // Mapa 10x10 
         boolean inside10x10 = dest.getX() >= 0 && dest.getX() < 10 && dest.getY() >= 0 && dest.getY() < 10;
 
         // se o destino estiver FORA dos limites 10x10 => considerada saída
@@ -96,13 +96,41 @@ public abstract class GameCharacter extends GameObject {
     public void die() {
         if (!alive)
             return;
+
         alive = false;
         Room r = getRoom();
-        if (r != null) {
-            r.removeObject(this); // remove de objects e imageTiles
+        Point2D pos = getPosition();
+
+        // Efeito visual blood
+        try {
+            if (r != null && pos != null) {
+                Effect fx = new Effect(pos, r, "blood", 6); 
+        
+                try {
+                    r.addObject(fx);
+                    
+                } catch (Throwable t) {
+                }
+
+                try {
+                    if (ImageGUI.getInstance() != null) {
+                        ImageGUI.getInstance().addImage(fx);
+                        ImageGUI.getInstance().update();
+                    }
+                } catch (Throwable t) {     
+                }
+            } else { 
+            }
+        } catch (Throwable ignored) {    
         }
+        // --- Lógica original de morte
+        if (r != null) {
+            r.removeObject(this);
+        }
+
         setRoom(null);
         setPosition(new Point2D(-1, -1));
+
         try {
             if (ImageGUI.getInstance() != null)
                 ImageGUI.getInstance().update();

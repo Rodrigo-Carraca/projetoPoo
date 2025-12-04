@@ -16,6 +16,7 @@ import objects.Movable;
 import objects.Rock;
 import objects.GameCharacter;
 import objects.Crushable;
+import objects.Effect;
 
 
 public class Room {
@@ -45,7 +46,7 @@ public class Room {
 				for (int x = 0; x < line.length(); x++) {
 					char c = line.charAt(x);
 					Point2D pos = new Point2D(x, y);
-
+					
 					// Água sempre adicionada
 					Water w = new Water(pos, room);
 					room.objects.add(w);
@@ -96,7 +97,6 @@ public class Room {
 
 		return list;
 	}
-
 	
 	//GETTERS e SETTERS
 	public List<GameObject> getGameObjects() {
@@ -157,13 +157,10 @@ public class Room {
 	    if (obj == null)
 	        return;
 
-	    // remover de objects
 	    while (objects.remove(obj)) {
 	    }
-	    // remover de imageTiles
 	    while (imageTiles.remove(obj)) {
 	    }
-
 	    // se era um peixe, limpar referência
 	    if (obj == bigFish)
 	        bigFish = null;
@@ -173,14 +170,31 @@ public class Room {
 	    // Tentar também remover a imagem da GUI e forçar update.
 	    try {
 	        if (ImageGUI.getInstance() != null) {
-	            // removeImage tende a ser mais seguro do que clear/addImages em termos de flicker
 	            ImageGUI.getInstance().removeImage(obj);
 	            ImageGUI.getInstance().update();
 	        }
 	    } catch (Exception ignored) {
+	    	
 	    }
 	}
+	public void addObject(GameObject obj) {
+	    if (obj == null) 
+	    	return;
 
+	    this.objects.add(obj);
+	    this.imageTiles.add(obj);
+	    
+	    try {
+	        if (ImageGUI.getInstance() != null) {
+	            List<ImageTile> single = new ArrayList<>();
+	            single.add(obj);
+	            ImageGUI.getInstance().addImages(single);
+	            ImageGUI.getInstance().update();
+	        }
+	    } catch (Exception ignored) {
+	    	
+	    }
+	}
 
 	public void moveObject(GameObject obj, Point2D to) {
 	    if (obj == null || to == null) return;
@@ -192,118 +206,93 @@ public class Room {
 	        return;
 	    }
 
-	    // Calcular deslocamento
-	    int dx = to.getX() - from.getX();
-
-	    // Executa o movimento (actualiza posição do objecto)
 	    obj.setPosition(to);
 
-	    // --- REGRAS ESPECIAIS: quando uma Rock é MOVIMENTADA HORIZONTALMENTE,
-	    // cria-se um Crab por cima da posição ORIGINAL, se possível.
+	    //Movimento do Krab quando movemos horizontalmente a rock
 	    try {
-	        if (obj instanceof Rock && dx != 0) { // movimento horizontal
+	        if (obj instanceof Rock) {
 	            Point2D above = new Point2D(from.getX(), from.getY() - 1);
-	            // verificar limites
+
 	            if (isInsideBounds(above)) {
-	                // verificar se a célula acima está livre (top == null ou transposable)
 	                GameObject topAbove = getTopObjectAt(above);
 	                boolean free = (topAbove == null) || topAbove.isTransposable();
 
-	                // não criar se não estiver livre
 	                if (free) {
-	                    // garantir que não exista já um Crab nessa célula
-	                    boolean crabAlready = false;
+	                    boolean krabAlready = false;
 	                    for (GameObject g : getObjectsAt(above)) {
 	                        if (g instanceof Krab) {
-	                            crabAlready = true;
+	                            krabAlready = true;
 	                            break;
 	                        }
 	                    }
 
-	                    if (!crabAlready) {
-	                        Krab crab = new Krab(above, this);
-	                        objects.add(crab);
-	                        imageTiles.add(crab);
+	                    if (!krabAlready) {
+	                        Krab krab = new Krab(above, this);
+	                        objects.add(krab);
+	                        imageTiles.add(krab);
 	                        // tentar actualizar GUI com segurança
 	                        try {
 	                            if (ImageGUI.getInstance() != null) {
-	                                // adicionar só o novo tile é suficiente
 	                                List<ImageTile> single = new ArrayList<>();
-	                                single.add(crab);
+	                                single.add(krab);
 	                                ImageGUI.getInstance().addImages(single);
 	                                ImageGUI.getInstance().update();
 	                            }
-	                        } catch (Exception ignored) {}
+	                        } catch (Exception ignored) {
+	                        	
+	                        }
 	                    }
 	                }
 	            }
 	        }
 	    } catch (Throwable ignored) {
-	        // nunca falhar o movimento por causa da lógica de spawn
 	    }
 	}
-
 
 	public void applyGravity() {
 
 	    List<GameObject> snapshot = new ArrayList<>(objects);
 	    Map<GameObject, Point2D> origPos = new HashMap<>();
+	    
 	    for (GameObject g : snapshot)
 	        origPos.put(g, g.getPosition());
-
+	    
 	    for (GameObject go : snapshot) {
 
 	        Point2D start = origPos.get(go);
-	        if (start == null)
-	            continue;
-	        if (go.getPosition() == null)
+	        if (start == null || go.getPosition() == null) 
 	            continue;
 
-	        // Já moveu este tick?
-	        if (!go.getPosition().equals(start))
-	            continue;
-
-	        // Só nos interessa Movable com peso
-	        if (!(go instanceof Movable))
-	            continue;
 	        GameObject.Weight w = go.getWeight();
-	        if (w == GameObject.Weight.NONE)
-	            continue;
-
-	        // Se há personagem na mesma célula → não cai
-	        boolean characterInStart = false;
-	        for (GameObject obj : getObjectsAt(start)) {
-	            if (obj instanceof GameCharacter) {
-	                characterInStart = true;
-	                break;
-	            }
-	        }
-	        if (characterInStart)
-	            continue;
-
 	        Point2D below = new Point2D(start.getX(), start.getY() + 1);
-	        if (!isInsideBounds(below))
-	            continue;
 
 	        // Obter o objecto top na célula de baixo
 	        GameObject topBelow = getTopObjectAt(below);
 
-	        // --- Caso ESPECIAL: heavy a cair sobre um Crushable -> esmagamento
+	        // objeto pesado cai sobre um Crushable parte
 	        if (w == GameObject.Weight.HEAVY && topBelow instanceof Crushable) {
 	            try {
 	                ((Crushable) topBelow).onCrushedBy(this, go, below);
-	            } catch (Exception ignored) {
-	            }
-	            // mover o objeto pesado para a célula abaixo (após esmagamento)
+	            } catch (Exception ignored) {}
 	            moveObject(go, below);
-	            continue;
 	        }
 
-	        // Caso normal: delegar ao comportamento do objeto (onFall)
+	        // Queda normal
 	        try {
 	            ((Movable) go).onFall(this, start, below);
-	        } catch (Exception ignored) {
+	        } catch (Exception ignored) {}
+	    }
+
+	    try {
+	        List<GameObject> effectsSnapshot = new ArrayList<>(objects);
+	        for (GameObject go : effectsSnapshot) {
+	            if (go instanceof Effect) {
+	                try {
+	                    ((Effect) go).tick(); // diminui lifetime e auto-remove quando acabar
+	                } catch (Throwable ignored) {}
+	            }
 	        }
+	    } catch (Throwable ignored) {
 	    }
 	}
 }
