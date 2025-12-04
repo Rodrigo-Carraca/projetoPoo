@@ -1,0 +1,94 @@
+package objects;
+
+import pt.iscte.poo.game.Room;
+import pt.iscte.poo.utils.Point2D;
+import pt.iscte.poo.utils.Vector2D;
+
+import java.util.List;
+
+/**
+ * Buoy (Boia) — objecto leve que tende a subir (flutuar).
+ */
+public class Buoy extends Movable {
+
+    private boolean sinking = false;
+
+    public Buoy(Point2D p, Room r) {
+        super(p, r);
+    }
+
+    @Override
+    public String getName() {
+        return "buoy";
+    }
+
+    @Override
+    public int getLayer() {
+        return 2;
+    }
+
+    @Override
+    public boolean isTransposable() {
+        return false;
+    }
+
+    @Override
+    public void move(Vector2D d) {
+        // não controlado diretamente por input
+    }
+
+    @Override
+    public int mutation() {
+        return 0;
+    }
+
+    @Override
+    public Weight getWeight() {
+        return Weight.LIGHT;
+    }
+
+    @Override
+    public void onFall(Room room, Point2D from, Point2D to) {
+        if (room == null || from == null)
+            return;
+
+        // verificar se existe algum Movable na célula acima (from.y - 1)
+        Point2D above = new Point2D(from.getX(), from.getY() - 1);
+        boolean hasMovableAbove = false;
+        if (room.isInsideBounds(above)) {
+            List<GameObject> objsAbove = room.getObjectsAt(above);
+            for (GameObject o : objsAbove) {
+                if (o instanceof Movable) {
+                    hasMovableAbove = true;
+                    break;
+                }
+            }
+        }
+
+        sinking = hasMovableAbove;
+
+        if (sinking) {
+            // tenta cair para 'to' (comportamento padrão)
+            if (to == null || !room.isInsideBounds(to)) return;
+            GameObject belowTop = room.getTopObjectAt(to);
+            if (belowTop == null || belowTop.isTransposable()) {
+                room.moveObject(this, to);
+            }
+            return;
+        }
+
+        // tenta subir (y-1)
+        if (room.isInsideBounds(above)) {
+            GameObject aboveTop = room.getTopObjectAt(above);
+            if (aboveTop == null || aboveTop.isTransposable()) {
+                room.moveObject(this, above);
+            }
+        }
+    }
+
+    @Override
+    public boolean canBePushedBy(GameCharacter c) {
+        if (c == null) return false;
+        return c.canPushWeight(getWeight());
+    }
+}

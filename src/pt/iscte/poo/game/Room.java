@@ -8,10 +8,12 @@ import pt.iscte.poo.gui.ImageGUI;
 import pt.iscte.poo.utils.Point2D;
 
 import objects.GameObject;
+import objects.Krab;
 import objects.Water;
 import objects.BigFish;
 import objects.SmallFish;
 import objects.Movable;
+import objects.Rock;
 import objects.GameCharacter;
 import objects.Crushable;
 
@@ -181,8 +183,66 @@ public class Room {
 
 
 	public void moveObject(GameObject obj, Point2D to) {
-		obj.setPosition(to);
+	    if (obj == null || to == null) return;
+
+	    Point2D from = obj.getPosition();
+	    // se não havia posição anterior, só atualiza
+	    if (from == null) {
+	        obj.setPosition(to);
+	        return;
+	    }
+
+	    // Calcular deslocamento
+	    int dx = to.getX() - from.getX();
+
+	    // Executa o movimento (actualiza posição do objecto)
+	    obj.setPosition(to);
+
+	    // --- REGRAS ESPECIAIS: quando uma Rock é MOVIMENTADA HORIZONTALMENTE,
+	    // cria-se um Crab por cima da posição ORIGINAL, se possível.
+	    try {
+	        if (obj instanceof Rock && dx != 0) { // movimento horizontal
+	            Point2D above = new Point2D(from.getX(), from.getY() - 1);
+	            // verificar limites
+	            if (isInsideBounds(above)) {
+	                // verificar se a célula acima está livre (top == null ou transposable)
+	                GameObject topAbove = getTopObjectAt(above);
+	                boolean free = (topAbove == null) || topAbove.isTransposable();
+
+	                // não criar se não estiver livre
+	                if (free) {
+	                    // garantir que não exista já um Crab nessa célula
+	                    boolean crabAlready = false;
+	                    for (GameObject g : getObjectsAt(above)) {
+	                        if (g instanceof Krab) {
+	                            crabAlready = true;
+	                            break;
+	                        }
+	                    }
+
+	                    if (!crabAlready) {
+	                        Krab crab = new Krab(above, this);
+	                        objects.add(crab);
+	                        imageTiles.add(crab);
+	                        // tentar actualizar GUI com segurança
+	                        try {
+	                            if (ImageGUI.getInstance() != null) {
+	                                // adicionar só o novo tile é suficiente
+	                                List<ImageTile> single = new ArrayList<>();
+	                                single.add(crab);
+	                                ImageGUI.getInstance().addImages(single);
+	                                ImageGUI.getInstance().update();
+	                            }
+	                        } catch (Exception ignored) {}
+	                    }
+	                }
+	            }
+	        }
+	    } catch (Throwable ignored) {
+	        // nunca falhar o movimento por causa da lógica de spawn
+	    }
 	}
+
 
 	public void applyGravity() {
 

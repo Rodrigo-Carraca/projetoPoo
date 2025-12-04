@@ -34,10 +34,6 @@ public class BigFish extends GameCharacter {
 		return facingRight ? "bigFishRight" : "bigFishLeft";
 	}
 
-	/**
-	 * Atualiza facing, chama super.move(delta) para as verificações / movimentos simples.
-	 * Se o peixe **não** se moveu, re-calcula localmente a cadeia (chain) e aplica as regras do BigFish.
-	 */
 	@Override
 	public void move(Vector2D delta) {
 		if (delta == null)
@@ -66,7 +62,6 @@ public class BigFish extends GameCharacter {
 			return;
 
 		Point2D dest = start.plus(delta);
-		// Verificações semelhantes às que estavam originalmente em GameCharacter
 		if (!r.isInsideBounds(dest))
 			return;
 
@@ -77,7 +72,6 @@ public class BigFish extends GameCharacter {
 			return;
 		}
 
-		// se é Passable e pode passar, já teria sido movido por super; se não, bloqueia
 		if (top instanceof Passable) {
 			if (((Passable) top).canPass(this)) {
 				r.moveObject(this, dest);

@@ -38,7 +38,7 @@ public class Anchor extends Movable {
 	
 	@Override
 	public Weight getWeight() {
-	    return Weight.HEAVY; // ou HEAVY ou NONE conforme o objeto
+	    return Weight.HEAVY; 
 	}
 	
 	@Override

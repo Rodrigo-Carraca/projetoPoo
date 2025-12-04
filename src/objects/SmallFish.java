@@ -49,7 +49,6 @@ import pt.iscte.poo.game.Room;
 			// guarda posição inicial para saber se super.move já moveu o peixe
 			Point2D start = getPosition();
 
-			// executa a parte comum (move simples se possível)
 			super.move(delta);
 
 			// se super.move alterou a posição, já movemos — nada mais a fazer

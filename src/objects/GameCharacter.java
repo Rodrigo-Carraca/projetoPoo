@@ -52,7 +52,7 @@ public abstract class GameCharacter extends GameObject {
 
         Point2D dest = getPosition().plus(delta);
 
-        // --- USAR limites FIXOS 10x10 (0..9)
+        // --- USAR limites FIXOS 10x10 
         boolean inside10x10 = dest.getX() >= 0 && dest.getX() < 10 && dest.getY() >= 0 && dest.getY() < 10;
 
         // se o destino estiver FORA dos limites 10x10 => considerada saída
