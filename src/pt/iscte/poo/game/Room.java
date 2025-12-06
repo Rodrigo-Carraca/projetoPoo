@@ -14,10 +14,8 @@ import objects.BigFish;
 import objects.SmallFish;
 import objects.Movable;
 import objects.Rock;
-import objects.GameCharacter;
 import objects.Crushable;
 import objects.Effect;
-
 
 public class Room {
 

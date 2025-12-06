@@ -7,9 +7,6 @@ import pt.iscte.poo.gui.ImageGUI;
 
 import java.util.Random;
 
-/**
- * Crab (Caranguejo) — movel leve, não empurrável, reage aos movimentos do jogador.
- */
 public class Krab extends Movable {
 
     private final Random rnd = new Random();
@@ -42,7 +39,6 @@ public class Krab extends Movable {
 				return;
 			randomStep(r);
 		} catch (Throwable t) {
-			System.err.println("Crab.move error: " + t.getMessage());
 		}
 	}
 
@@ -73,10 +69,7 @@ public class Krab extends Movable {
         }
     }
 
-    /**
-     * Tenta mover horizontalmente; tratamento de interações com peixes/armadilha.
-     * Retorna true se efectivamente se moveu (ou causou uma morte e moveu).
-     */
+    //Tenta mover horizontalmente; tratamento de interações com peixes/armadilha.
     public boolean tryMoveHorizontal(Room room, int dx) {
         if (room == null || getPosition() == null) return false;
         Point2D dest = new Point2D(getPosition().getX() + dx, getPosition().getY());

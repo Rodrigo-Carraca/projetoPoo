@@ -6,9 +6,6 @@ import pt.iscte.poo.utils.Vector2D;
 
 import java.util.List;
 
-/**
- * Buoy (Boia) — objecto leve que tende a subir (flutuar).
- */
 public class Buoy extends Movable {
 
     private boolean sinking = false;

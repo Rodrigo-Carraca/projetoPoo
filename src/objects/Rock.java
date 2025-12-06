@@ -32,7 +32,7 @@ public class Rock extends Movable {
 
     @Override
     public void move(Vector2D d) {
-        /* static for CP1 */
+        
     }
 
     @Override

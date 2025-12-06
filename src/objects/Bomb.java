@@ -90,7 +90,7 @@ public class Bomb extends Movable implements Explodable {
 			}
 		}
 
-		// --- 2) adjacentes N,S,E,W — removemos sobre uma cópia da lista para evitar
+		// --- 2) Posições adjacentes — removemos sobre uma cópia da lista para evitar
 		// concurrent modification
 		Point2D[] adj = new Point2D[] { new Point2D(bx, by - 1), new Point2D(bx, by + 1), new Point2D(bx - 1, by),
 				new Point2D(bx + 1, by) };
@@ -168,9 +168,7 @@ public class Bomb extends Movable implements Explodable {
 			wasFalling = false;
 			return;
 		}
-
-		// topo é objecto sólido "normal" (não parede): explode apenas se vinha de queda
-		// e está armada
+		// topo é objecto sólido "normal" (não parede): explode apenas se vinha de queda e está armada
 		if (wasFalling && armed) {
 			explode(room, to);
 			return;

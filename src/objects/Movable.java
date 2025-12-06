@@ -3,10 +3,6 @@ package objects;
 import pt.iscte.poo.game.Room;
 import pt.iscte.poo.utils.Point2D;
 
-/**
- * Movable: classe abstrata base para objectos móveis.
- * NOTA: onFall por omissão NÃO contém lógica. Cada subclasse implementa o seu comportamento.
- */
 public abstract class Movable extends GameObject {
 
     public Movable(Point2D position, Room room) {

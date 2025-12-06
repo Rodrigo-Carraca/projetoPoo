@@ -23,6 +23,9 @@ import pt.iscte.poo.utils.Direction;
 import pt.iscte.poo.utils.Point2D;
 import pt.iscte.poo.utils.Vector2D;
 
+import highscores.HighscoreManager;
+import highscores.Highscore;
+
 public class GameEngine implements Observer {
 
 	private static GameEngine INSTANCE = null;
@@ -38,6 +41,12 @@ public class GameEngine implements Observer {
 	private int lastTickProcessed = 0;
 	private GameCharacter controlled;
 
+	// Contagem
+	private HighscoreManager highscoreManager = new HighscoreManager();
+	private long gameStartTime = -1L; // tempo total desde início do jogo
+	private int totalMoves = 0; // movimentos acumulados da run inteira
+	private boolean gameEnded = false; // evita pedido infinito de nome
+
 	private GameEngine() {
 		rooms = new HashMap<>();
 		loadGame();
@@ -46,7 +55,7 @@ public class GameEngine implements Observer {
 		if (currentRoom == null && !rooms.isEmpty())
 			currentRoom = rooms.values().iterator().next();
 
-		// associar room às instâncias singletons 
+		// Associar room aos singletons
 		try {
 			if (SmallFish.getInstance() != null)
 				SmallFish.getInstance().setRoom(currentRoom);
@@ -59,6 +68,11 @@ public class GameEngine implements Observer {
 		}
 
 		pickInitialControlled();
+
+		// Iniciar contagem global APENAS uma vez
+		gameStartTime = System.currentTimeMillis();
+		totalMoves = 0;
+		gameEnded = false;
 
 		updateStatusMessage();
 		updateGUI();
@@ -80,104 +94,105 @@ public class GameEngine implements Observer {
 
 	@Override
 	public void update(Observed source) {
-		// 1) Input do utilizador
+		// Se jogo terminou → só aceitar 'R', e mais nada
+		if (gameEnded) {
+			if (ImageGUI.getInstance().wasKeyPressed()) {
+				int k = ImageGUI.getInstance().keyPressed();
+				if (k == KeyEvent.VK_R) {
+					restartLevel();
+					gameEnded = false;
+				}
+			}
+			return;
+		}
+
+		//Utilizador
 		if (ImageGUI.getInstance().wasKeyPressed()) {
 			int k = ImageGUI.getInstance().keyPressed();
 
-			if (k == KeyEvent.VK_SPACE) { //Alternar
+			if (k == KeyEvent.VK_SPACE) {
 				toggleControlled();
 				updateStatusMessage();
-				
+
 			} else if (k == KeyEvent.VK_R) {
-				restartLevel();
-				
-			} else {	
+				restartLevel(); // NÃO reinicia contadores!
+
+			} else {
 				try {
 					Vector2D delta = Direction.directionFor(k).asVector();
-					if (controlled != null && !controlled.isOut() && controlled.getRoom() != null && controlled.isAlive()) {
+					if (controlled != null && !controlled.isOut() && controlled.getRoom() != null
+							&& controlled.isAlive()) {
+
+						Point2D oldPos = clonePosition(controlled.getPosition());
 						controlled.move(delta);
-						
-						notifyCrabsOnPlayerMove(); //Notificar Krabs qd um jogador se move
+						Point2D newPos = clonePosition(controlled.getPosition());
+
+						if (!positionsEqual(oldPos, newPos)) {
+							totalMoves++; // movimento válido
+						}
+
+						notifyCrabsOnPlayerMove();
 					}
 
-					// Após mover via teclado, verificar possíveis saídas
 					checkExit(BigFish.getInstance());
 					checkExit(SmallFish.getInstance());
-					
-					// escolha do jogador
 					updateStatusMessage();
 
 				} catch (Exception ignored) {
-					// tecla não mapeada
 				}
 			}
 		}
-		// 2) Ticks / Gravidade
+
+		//Gravidade/Ticks
 		int t = ImageGUI.getInstance().getTicks();
 		while (lastTickProcessed < t)
 			processTick();
 
-		notifyCrabsOnPlayerMove();  // Permite que crabs reajam a movimentos através do processo de ticks/gravidade
+		notifyCrabsOnPlayerMove();
 
-		// 3) Atualizar GUI
+		//Atualiza GUI
 		try {
 			ImageGUI.getInstance().update();
 		} catch (Exception ignored) {
 		}
 
-		try {
-			checkExit(BigFish.getInstance());
-		} catch (Exception ignored) {
-		}
-		try {
-			checkExit(SmallFish.getInstance());
-		} catch (Exception ignored) {
-		}
-		ensureControlledStillValid(); // só altera se o controlado deixou de ser válido
+		checkExit(BigFish.getInstance());
+		checkExit(SmallFish.getInstance());
+
+		ensureControlledStillValid();
 		updateStatusMessage();
 
-		// 5) Reinício se algum peixe morreu — mostrar diálogo antes de reiniciar
+		//GameOver (Morte)
 		SmallFish sf = SmallFish.getInstance();
 		BigFish bf = BigFish.getInstance();
-		boolean smallDead = (sf != null && !sf.isAlive());
-		boolean bigDead = (bf != null && !bf.isAlive());
+		boolean smallDead = sf != null && !sf.isAlive();
+		boolean bigDead = bf != null && !bf.isAlive();
 
 		if (smallDead || bigDead) {
 			String who;
-			if (smallDead && bigDead) who = "Both fish died!";
-			else if (smallDead) who = "SmallFish morreu!";
-			else who = "BigFish morreu!";
+			if (smallDead && bigDead)
+				who = "Both fish died!";
+			else if (smallDead)
+				who = "SmallFish morreu!";
+			else
+				who = "BigFish morreu!";
 
 			final String msg = "GAME OVER!\n" + who;
 
-			// mostrar diálogo modal no EDT (Event Dispatch Thread)
 			try {
-				SwingUtilities.invokeAndWait(() -> {
-					JOptionPane.showMessageDialog(
-						null,
-						msg,
-						"Message",
-						JOptionPane.INFORMATION_MESSAGE
-					);
-				});
+				SwingUtilities.invokeAndWait(
+						() -> JOptionPane.showMessageDialog(null, msg, "Message", JOptionPane.INFORMATION_MESSAGE));
 			} catch (Exception e) {
-				// fallback simples caso invokeAndWait falhe por qualquer motivo
 				try {
-					JOptionPane.showMessageDialog(
-						null,
-						msg,
-						"Message",
-						JOptionPane.INFORMATION_MESSAGE
-					);
-				} catch (Exception ignored) {}
+					JOptionPane.showMessageDialog(null, msg, "Message", JOptionPane.INFORMATION_MESSAGE);
+				} catch (Exception ignored) {
+				}
 			}
 
-			// agora reiniciar o nível
 			restartLevel();
 			return;
 		}
-
-		// 6) Verificar se ambos saíram -> avançar nível
+		//Passagem de nível
 		checkLevelCompletion();
 	}
 
@@ -187,7 +202,6 @@ public class GameEngine implements Observer {
 			currentRoom.applyGravity();
 	}
 
-	//Reconstrói a GUI a partir dos imageTiles da currentRoom. 
 	public void updateGUI() {
 		if (currentRoom != null) {
 			try {
@@ -203,91 +217,55 @@ public class GameEngine implements Observer {
 		}
 	}
 
-	// Caso esteja disponível alterna o personagem controlado pelo jogador (SPACE)
 	private void toggleControlled() {
 		GameCharacter big = BigFish.getInstance();
 		GameCharacter small = SmallFish.getInstance();
 
-		boolean bigAvailable = big != null && big.isAlive() && !big.isOut() && big.getRoom() != null;
-		boolean smallAvailable = small != null && small.isAlive() && !small.isOut() && small.getRoom() != null;
+		boolean bigA = big != null && big.isAlive() && !big.isOut();
+		boolean smallA = small != null && small.isAlive() && !small.isOut();
 
-		// nenhum disponível
-		if (!bigAvailable && !smallAvailable) {
+		if (!bigA && !smallA) {
 			controlled = null;
 			return;
 		}
 
-		// se controlado actual é null -> escolhe preferencialmente big
 		if (controlled == null) {
-			if (bigAvailable) {
-				controlled = big;
-				return;
-			}
-			if (smallAvailable) {
-				controlled = small;
-				return;
-			}
-		}
-
-		// se controlado actual não é mais válido -> escolher outro disponível
-		if (controlled != null && (!controlled.isAlive() || controlled.isOut() || controlled.getRoom() == null)) {
-			if (bigAvailable) {
-				controlled = big;
-				return;
-			}
-			if (smallAvailable) {
-				controlled = small;
-				return;
-			}
-			controlled = null;
+			controlled = bigA ? big : small;
 			return;
 		}
 
-		// se ambos disponíveis -> alterna
-		if (bigAvailable && smallAvailable) {
-			if (controlled == big)
-				controlled = small;
-			else
-				controlled = big;
+		if (!controlled.isAlive() || controlled.isOut()) {
+			controlled = bigA ? big : smallA ? small : null;
 			return;
 		}
 
-		// caso apenas um disponível -> escolhe esse
-		if (bigAvailable)
+		if (bigA && smallA) {
+			controlled = (controlled == big ? small : big);
+			return;
+		}
+
+		if (bigA)
 			controlled = big;
-		else if (smallAvailable)
+		else if (smallA)
 			controlled = small;
 	}
 
-	// Garante que a personagem controlada está valida
 	private void ensureControlledStillValid() {
-		if (controlled == null) {
+		if (controlled == null || !controlled.isAlive() || controlled.isOut()) {
 			pickInitialControlled();
-			return;
 		}
-		if (controlled.isAlive() && !controlled.isOut() && controlled.getRoom() != null) {
-			return;
-		}
-		pickInitialControlled(); // senão escolhe outro disponível (prefere BigFish)
 	}
 
-	//Escolhe o personagem inicial (prefere BigFish)
 	private void pickInitialControlled() {
 		GameCharacter big = BigFish.getInstance();
 		GameCharacter small = SmallFish.getInstance();
 
-		boolean bigAvailable = big != null && big.isAlive() && !big.isOut() && big.getRoom() != null;
-		boolean smallAvailable = small != null && small.isAlive() && !small.isOut() && small.getRoom() != null;
-
-		if (bigAvailable) {
+		if (big != null && big.isAlive() && !big.isOut())
 			controlled = big;
-			return;
-		}
-		if (smallAvailable) {
+		else if (small != null && small.isAlive() && !small.isOut())
 			controlled = small;
-			return;
-		}
-		controlled = null;
+		else
+			controlled = null;
 	}
 
 	private void updateStatusMessage() {
@@ -298,15 +276,11 @@ public class GameEngine implements Observer {
 		}
 	}
 
-	//Verifica se algum peixe saiu
 	private void checkExit(GameCharacter fish) {
-		if (fish == null)
-			return;
-		if (fish.isOut())
+		if (fish == null || fish.isOut())
 			return;
 
-		// sem room => out
-		if (fish.getRoom() == null) {
+		if (fish.getRoom() == null || fish.getPosition() == null) {
 			fish.setOut(true);
 			try {
 				ImageGUI.getInstance().removeImage(fish);
@@ -315,36 +289,14 @@ public class GameEngine implements Observer {
 			return;
 		}
 
-		// posição nula => out
-		if (fish.getPosition() == null) {
-			fish.setOut(true);
-			try {
-				ImageGUI.getInstance().removeImage(fish);
-			} catch (Exception ignored) {
-			}
-			try {
-				fish.setPosition(new Point2D(-1, -1));
-				fish.setRoom(null);
-			} catch (Throwable ignored) {
-			}
-			return;
-		}
-
-		// limites fixos 10x10
 		int x = fish.getPosition().getX();
 		int y = fish.getPosition().getY();
-		boolean inside10x10 = (x >= 0 && x < 10 && y >= 0 && y < 10);
 
-		if (!inside10x10) {
+		if (x < 0 || x >= 10 || y < 0 || y >= 10) {
 			fish.setOut(true);
 			try {
 				ImageGUI.getInstance().removeImage(fish);
 			} catch (Exception ignored) {
-			}
-			try {
-				fish.setPosition(new Point2D(-1, -1));
-				fish.setRoom(null);
-			} catch (Throwable ignored) {
 			}
 		}
 	}
@@ -353,92 +305,39 @@ public class GameEngine implements Observer {
 		BigFish big = BigFish.getInstance();
 		SmallFish small = SmallFish.getInstance();
 
-		boolean bigOut = (big == null || big.isOut());
-		boolean smallOut = (small == null || small.isOut());
-
-		if (bigOut && smallOut) { //Se ambos tiverem fora, passou o nível
+		if ((big == null || big.isOut()) && (small == null || small.isOut())) {
 			loadNextLevel();
 		}
 	}
 
 	private void loadNextLevel() {
 		int currentLevel = 0;
-		if (currentRoom != null && currentRoom.getName() != null) {
-			try {
-				String digits = currentRoom.getName().replaceAll("\\D+", "");
-				if (!digits.isEmpty())
-					currentLevel = Integer.parseInt(digits);
-			} catch (Exception ignored) {
-			}
+
+		try {
+			String digits = currentRoom.getName().replaceAll("\\D+", "");
+			if (!digits.isEmpty())
+				currentLevel = Integer.parseInt(digits);
+		} catch (Exception ignored) {
 		}
 
 		int nextLevel = currentLevel + 1;
 		String nextName = "room" + nextLevel + ".txt";
 
-		// reset singletons antes de ler nova room
-		try {
-			BigFish.resetInstance();
-		} catch (Throwable ignored) {
-		}
-		try {
-			SmallFish.resetInstance();
-		} catch (Throwable ignored) {
-		}
+		BigFish.resetInstance();
+		SmallFish.resetInstance();
 
-		Room next = null;
 		File f = new File("./rooms/" + nextName);
-		if (f.exists()) {
-			Room freshlyRead = Room.readRoom(f, this);
-			if (freshlyRead != null) {
-				next = freshlyRead;
-				rooms.put(nextName, freshlyRead);
-				
-			} else {
-				next = rooms.get(nextName);
-			}
-			
-		} else {
-	
-			next = rooms.get(nextName); 
-		}
+		Room next = f.exists() ? Room.readRoom(f, this) : rooms.get(nextName);
 
+		//Fim do Jogo
 		if (next == null) {
+			onGameEnd();
 			return;
 		}
 
 		currentRoom = next;
 
-		// sincronizar singletons a partir de instâncias locais na room (se existirem)
-		try {
-			GameCharacter bfLocal = currentRoom.getBigFish();
-			if (bfLocal != null)
-				BigFish.getInstance(bfLocal.getPosition(), currentRoom);
-		} catch (Throwable ignored) {
-		}
-		try {
-			GameCharacter sfLocal = currentRoom.getSmallFish();
-			if (sfLocal != null)
-				SmallFish.getInstance(sfLocal.getPosition(), currentRoom);
-		} catch (Throwable ignored) {
-		}
-
-		// garantir estado dos singletons
-		try {
-			if (BigFish.getInstance() != null) {
-				BigFish.getInstance().setRoom(currentRoom);
-				BigFish.getInstance().setOut(false);
-			}
-		} catch (Throwable ignored) {
-		}
-		try {
-			if (SmallFish.getInstance() != null) {
-				SmallFish.getInstance().setRoom(currentRoom);
-				SmallFish.getInstance().setOut(false);
-			}
-		} catch (Throwable ignored) {
-		}
-
-		// reconstruir GUI
+		// reconstruir GUI e singletons
 		try {
 			ImageGUI.getInstance().clearImages();
 			ImageGUI.getInstance().addImages(currentRoom.getObjects());
@@ -446,48 +345,36 @@ public class GameEngine implements Observer {
 		} catch (Exception ignored) {
 		}
 
-		// escolher controlado (se current == null ou inválido)
+		try {
+			if (currentRoom.getBigFish() != null)
+				BigFish.getInstance(currentRoom.getBigFish().getPosition(), currentRoom);
+		} catch (Throwable ignored) {
+		}
+		try {
+			if (currentRoom.getSmallFish() != null)
+				SmallFish.getInstance(currentRoom.getSmallFish().getPosition(), currentRoom);
+		} catch (Throwable ignored) {
+		}
+
 		ensureControlledStillValid();
 		updateStatusMessage();
 	}
 
-	//Reset no nível caso algum peixe morra
+	// Reiniciar o nível NÃO reinicia tempo nem movimentos!
 	private void restartLevel() {
-		String roomName = (currentRoom != null && currentRoom.getName() != null) ? currentRoom.getName() : "room0.txt";
+		String roomName = currentRoom.getName();
 
-		try {
-			BigFish.resetInstance();
-		} catch (Throwable ignored) {
-		}
-		try {
-			SmallFish.resetInstance();
-		} catch (Throwable ignored) {
-		}
+		BigFish.resetInstance();
+		SmallFish.resetInstance();
 
 		File f = new File("./rooms/" + roomName);
-		if (!f.exists())
-			return;
+		Room r = (f.exists() ? Room.readRoom(f, this) : null);
 
-		Room r = Room.readRoom(f, this);
 		if (r == null)
 			return;
 
 		rooms.put(roomName, r);
 		currentRoom = r;
-
-		// sincronizar singletons pela room recarregada
-		try {
-			GameCharacter bfLocal = currentRoom.getBigFish();
-			if (bfLocal != null)
-				BigFish.getInstance(bfLocal.getPosition(), currentRoom);
-		} catch (Throwable ignored) {
-		}
-		try {
-			GameCharacter sfLocal = currentRoom.getSmallFish();
-			if (sfLocal != null)
-				SmallFish.getInstance(sfLocal.getPosition(), currentRoom);
-		} catch (Throwable ignored) {
-		}
 
 		try {
 			ImageGUI.getInstance().clearImages();
@@ -506,40 +393,84 @@ public class GameEngine implements Observer {
 
 	public void setCurrentRoom(Room r) {
 		this.currentRoom = r;
-		try {
-			if (SmallFish.getInstance() != null)
-				SmallFish.getInstance().setRoom(r);
-		} catch (Throwable ignored) {
-		}
-		try {
-			if (BigFish.getInstance() != null)
-				BigFish.getInstance().setRoom(r);
-		} catch (Throwable ignored) {
-		}
 		ensureControlledStillValid();
 		updateGUI();
 	}
 
-	//Notifica todos os Crabs na currentRoom para reagirem a um movimento de peixe, através de ticks
 	private void notifyCrabsOnPlayerMove() {
-		try {
-			if (currentRoom == null)
-				return;
-			List<GameObject> gos = currentRoom.getGameObjects();
-			for (GameObject go : gos) {
-				if (go instanceof Krab) {
-					try {
-						((Krab) go).move(null); //move chama randomStep
-					} catch (Throwable ignored) {
-					}
+		if (currentRoom == null)
+			return;
+		List<GameObject> gos = currentRoom.getGameObjects();
+		for (GameObject go : gos) {
+			if (go instanceof Krab) {
+				try {
+					((Krab) go).move(null);
+				} catch (Throwable ignored) {
 				}
 			}
-			// atualizar GUI para reflectir eventuais movimentos dos crabs
-			try {
-				updateGUI();
-			} catch (Exception ignored) {
-			}
-		} catch (Throwable ignored) {
 		}
+		try {
+			updateGUI();
+		} catch (Exception ignored) {
+		}
+	}
+
+	//HighScore
+	private void onGameEnd() {
+
+		if (gameEnded)
+			return; // garantir que só corre 1 vez
+
+		long elapsed = System.currentTimeMillis() - gameStartTime;
+
+		String playerName = null;
+		try {
+			final String[] holder = new String[1];
+			SwingUtilities.invokeAndWait(() -> holder[0] = JOptionPane.showInputDialog(null, "Nome:",
+					"Guardar Highscore", JOptionPane.PLAIN_MESSAGE));
+			playerName = holder[0];
+		} catch (Exception ignored) {
+		}
+
+		if (playerName == null || playerName.trim().isEmpty())
+			playerName = "Jogador";
+
+		highscoreManager.addScore(playerName, elapsed, totalMoves);
+
+		showHighscoresPopup();
+
+		gameEnded = true;
+	}
+
+	private void showHighscoresPopup() {
+		StringBuilder sb = new StringBuilder("HIGHSCORES:\n\n");
+		int i = 1;
+
+		for (Highscore h : highscoreManager.getScores()) {
+			sb.append(i++).append(". ").append(h.getName()).append(" - ").append(h.getTimeMillis() / 1000)
+					.append("s - ").append(h.getMoves()).append(" moves\n");
+		}
+
+		try {
+			SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(null, sb.toString(), "Highscores",
+					JOptionPane.INFORMATION_MESSAGE));
+		} catch (Exception ignored) {
+			System.out.println(sb);
+		}
+	}
+	
+	//Funções para ajudar
+	private boolean positionsEqual(Point2D a, Point2D b) {
+		if (a == null && b == null)
+			return true;
+		if (a == null || b == null)
+			return false;
+		return a.getX() == b.getX() && a.getY() == b.getY();
+	}
+
+	private Point2D clonePosition(Point2D p) {
+		if (p == null)
+			return null;
+		return new Point2D(p.getX(), p.getY());
 	}
 }

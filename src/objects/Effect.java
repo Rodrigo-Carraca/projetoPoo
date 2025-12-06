@@ -4,16 +4,10 @@ import pt.iscte.poo.game.Room;
 import pt.iscte.poo.utils.Point2D;
 import pt.iscte.poo.utils.Vector2D;
 
-
-/**
- * Effect visual temporário (ex.: sangue, explosão).
- * - É um GameObject leve (Weight.NONE), não interactivo, e auto-destrói-se após N ticks.
- * - getLayer() deve ser maior do que a layer das personagens para ficar visível por cima.
- */
 public class Effect extends GameObject {
 
     private int remainingTicks;
-    private final String effectName; // nome usado pelo ImageGUI (ex.: "blood", "boom", "spark")
+    private final String effectName; // blood ou boom
 
     public Effect(Point2D pos, Room r, String effectName, int ticks) {
         super(pos, r);
@@ -33,8 +27,7 @@ public class Effect extends GameObject {
     }
 
     @Override
-    public boolean isTransposable() {
-        // efeito não bloqueia movimentos (pode ser atravessado)
+    public boolean isTransposable() { //efeito pode ser atravessado
         return true;
     }
 
@@ -53,16 +46,13 @@ public class Effect extends GameObject {
         return Weight.NONE;
     }
 
-    /**
-     * Chamado pelo Room a cada tick para decrementar o life-time.
-     * Quando terminar, remove-se da room (e da GUI).
-     */
+    //Chamado pelo Room a cada tick para decrementar o life-time.
+    //Quando terminar, remove-se da room (e da GUI).
     public void tick() {
         remainingTicks--;
         if (remainingTicks <= 0) {
             Room r = getRoom();
             if (r != null) {
-                // removeObject cuida de imageTiles/GUI
                 r.removeObject(this);
             }
         }

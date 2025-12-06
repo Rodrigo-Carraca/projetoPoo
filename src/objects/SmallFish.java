@@ -1,16 +1,11 @@
 package objects;
 	
-	import pt.iscte.poo.utils.Point2D;
-	import pt.iscte.poo.utils.Vector2D;
-
+import pt.iscte.poo.utils.Point2D;
+import pt.iscte.poo.utils.Vector2D;
 import java.util.ArrayList;
 import java.util.List;
-
 import pt.iscte.poo.game.Room;
 	
-	/**
-	 * SmallFish (jogador). Singleton.
-	 */
 	public class SmallFish extends GameCharacter {
 	
 		private static SmallFish INSTANCE = null;
@@ -55,7 +50,7 @@ import pt.iscte.poo.game.Room;
 			if (!getPosition().equals(start))
 				return;
 
-			// ---- A partir daqui: super.move não moveu o peixe -> recalcular e aplicar regras específicas
+			//A partir daqui: super.move não moveu o peixe -> recalcular e aplicar regras específicas
 
 			Room r = getRoom();
 			if (r == null)
@@ -102,12 +97,11 @@ import pt.iscte.poo.game.Room;
 				cur = cur.plus(delta);
 			}
 
-			// SmallFish rules: must be exactly one movable and it must be LIGHT
 			if (chain.size() != 1)
 				return;
 
 			GameObject only = chain.get(0);
-			if (only.getWeight() != GameObject.Weight.LIGHT)
+			if (only.getWeight() != GameObject.Weight.LIGHT) //só pode mover Light
 				return;
 
 			Point2D beyond = cur;

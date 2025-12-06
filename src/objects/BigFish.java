@@ -7,9 +7,6 @@ import pt.iscte.poo.game.Room;
 import pt.iscte.poo.utils.Point2D;
 import pt.iscte.poo.utils.Vector2D;
 
-/**
- * BigFish singleton. Sem IA (movimenta-se apenas quando controlado).
- */
 public class BigFish extends GameCharacter {
 
 	private static BigFish INSTANCE = null;
@@ -54,7 +51,7 @@ public class BigFish extends GameCharacter {
 		if (!getPosition().equals(start))
 			return;
 
-		// ---- A partir daqui: super.move não moveu o peixe -> recalcular e aplicar regras específicas
+		//A partir daqui: super.move não moveu o peixe -> recalcular e aplicar regras específicas
 
 		Room r = getRoom();
 		if (r == null)

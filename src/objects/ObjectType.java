@@ -33,9 +33,9 @@ public final class ObjectType {
             case 'Y':
                 return new Log(pos, room);
             case 'U':
-                return new Buoy(pos, room);     // Boia
+                return new Buoy(pos, room);     
             case 'K':
-                return new Krab(pos, room);     // Caranguejo (krab)
+                return new Krab(pos, room);   
             case 'B':
                 return BigFish.getInstance(pos, room);
             case 'S':

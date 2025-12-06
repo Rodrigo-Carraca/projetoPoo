@@ -5,9 +5,6 @@ import pt.iscte.poo.utils.Point2D;
 import pt.iscte.poo.utils.Vector2D;
 import pt.iscte.poo.game.Room;
 
-/**
- * Base de todos os objectos do jogo.
- */
 public abstract class GameObject implements ImageTile {
 	
 	public enum Weight {

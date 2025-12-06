@@ -41,10 +41,7 @@ public class Log extends GameObject implements Crushable {
 		return Weight.NONE;
 	}
 
-	/**
-	 * Quando esmagado por um objeto pesado, parte o Log e cria efeito de
-	 * estilhaços.
-	 */
+	//Quando esmagado por um objeto pesado, parte o Log e cria efeito de boom.
 	@Override
 	public void onCrushedBy(Room room, GameObject crusher, Point2D pos) {
 		if (room == null)
@@ -58,13 +55,11 @@ public class Log extends GameObject implements Crushable {
 			}
 		} catch (Throwable ignored) {
 		}
-
 		// remover o tronco
 		try {
 			room.removeObject(this);
 		} catch (Throwable ignored) {
 		}
-
 		// Forçar GUI update para mostrar efeito/removals
 		try {
 			GameEngine.getInstance().updateGUI();
